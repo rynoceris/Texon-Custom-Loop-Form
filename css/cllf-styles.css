@@ -2,6 +2,17 @@
  * Custom Laundry Loops Form Styles
  */
 
+/* Custom font declaration */
+ @font-face {
+     font-family: 'Jersey M54';
+     src: url('../fonts/JerseyM54.woff2') format('woff2'),
+          url('../fonts/JerseyM54.woff') format('woff'),
+          url('../fonts/JerseyM54.ttf') format('truetype');
+     font-weight: normal;
+     font-style: normal;
+     font-display: swap;
+ }
+
 .cllf-form-container {
     max-width: 100%;
     margin: 0 auto;
@@ -172,7 +183,7 @@
 }
 
 .cllf-form-group .description {
-    margin-top: 5px;
+    margin: 5px 0;
     font-size: 14px;
     color: #666;
 }
@@ -231,7 +242,7 @@
 
 .cllf-loop-image-container {
     position: relative;
-    max-width: 500px;
+    max-width: 1000px;
     margin: 0 auto;
 }
 
@@ -252,10 +263,9 @@
 }
 
 #cllf-preview-logo {
-    max-width: 40px;
-    max-height: 30%;
+    max-width: 100px;
     position: absolute;
-    left: 70px;
+    left: 515px;
     top: 78px;
 }
 
@@ -266,20 +276,31 @@
 
 #cllf-preview-text {
     font-weight: bold;
-    font-size: 13px;
+    font-size: 22px;
     color: #000;
     position: absolute;
-    left: 112px;
+    left: 630px;
     top: 70px;
 }
 
 #cllf-preview-tag {
     font-weight: bold;
-    font-size: 32px;
     color: #000;
+    top: 83px;
+    left: 630px;
     position: absolute;
-    top: 76px;
-    left: 113px;
+    height: 100px; /* Fixed height as requested */
+    display: flex;
+    justify-content: center; /* Center horizontally */
+    align-items: center; /* Center vertically */
+    box-sizing: border-box;
+    line-height: 1.2; /* Control line height */
+    font-family: 'Arial Black', sans-serif; /* Default font */
+}
+
+/* Numbers specific style will be added via JavaScript */
+#cllf-preview-tag.number-tag {
+    font-family: 'Jersey M54', sans-serif;
 }
 
 .cllf-preview-caption {
@@ -378,6 +399,275 @@
 
 .cllf-button-group .button:hover {
     background-color: #45a049;
+}
+
+.color-thumbnail img {
+    width: 290px;
+    max-width: 100%;
+}
+
+/* Scroll to top button */
+.cllf-scroll-top {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+}
+
+.cllf-scroll-top.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.cllf-scroll-top:hover {
+    background-color: #45a049;
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.cllf-scroll-top:active {
+    transform: translateY(0);
+}
+
+.cllf-scroll-top svg {
+    width: 24px;
+    height: 24px;
+}
+
+/* Media query for smaller screens */
+@media (max-width: 768px) {
+    .cllf-scroll-top {
+        bottom: 20px;
+        right: 20px;
+        width: 40px;
+        height: 40px;
+    }
+    
+    .cllf-scroll-top svg {
+        width: 20px;
+        height: 20px;
+    }
+}
+
+/* Text color selection styling */
+.color-preview {
+    display: inline-block;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+.color-preview span {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid #ddd;
+    vertical-align: middle;
+}
+
+#text_color {
+    width: calc(100% - 44px);
+    display: inline-block;
+    vertical-align: middle;
+}
+
+#custom-color-container {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.color-option {
+    display: flex;
+    align-items: center;
+}
+
+.color-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    border: 1px solid #ddd;
+    margin-right: 8px;
+    display: inline-block;
+}
+
+/* For the color picker */
+#color-picker-container {
+    margin-top: 10px;
+}
+
+.color-picker-tabs {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 10px;
+}
+
+.color-picker-tab {
+    padding: 8px 12px;
+    cursor: pointer;
+    background: #f1f1f1;
+    border: 1px solid #ddd;
+    border-bottom: none;
+    margin-right: 5px;
+    border-radius: 4px 4px 0 0;
+}
+
+.color-picker-tab.active {
+    background: white;
+    border-bottom: 1px solid white;
+    margin-bottom: -1px;
+}
+
+.color-picker-content {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-top: none;
+}
+
+.color-picker-panel {
+    display: none;
+}
+
+.color-picker-panel.active {
+    display: block;
+}
+
+/* Add to your CSS */
+.color-loading {
+    position: relative;
+}
+
+.color-loading:after {
+    content: "Extracting colors...";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-style: italic;
+    color: #333;
+}
+
+.file-type-note {
+    margin-top: 8px;
+    font-style: italic;
+    color: #666;
+    font-size: 13px;
+}
+
+.color-loading {
+    position: relative;
+}
+
+.color-loading:after {
+    content: "Extracting colors...";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #333;
+    z-index: 10;
+}
+
+/* Clip option styles */
+.clip-options {
+    display: flex;
+    gap: 20px;
+}
+
+.clip-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.clip-option:hover {
+    background-color: #f0f0f0;
+}
+
+.clip-option input[type="radio"]:checked + .option-text + .clip-thumbnail,
+.clip-option input[type="radio"]:checked + .option-text {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.clip-option input[type="radio"]:checked + .option-text + .clip-thumbnail {
+    border-color: #4CAF50;
+}
+
+.clip-option input[type="radio"] {
+    margin-bottom: 8px;
+}
+
+.option-text {
+    margin-bottom: 10px;
+    font-weight: normal;
+}
+
+.clip-thumbnail {
+    width: 80px;
+    height: 80px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: white;
+}
+
+.clip-thumbnail img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* Visual selection indication */
+.clip-option input[type="radio"]:checked ~ .clip-thumbnail {
+    border-color: #4CAF50;
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+}
+
+/* Font disclaimer styling */
+.font-disclaimer {
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-left: 3px solid #17a2b8;
+    color: #333;
+    font-size: 14px;
+    font-style: italic;
 }
 
 /* Loading indicator */

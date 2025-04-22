@@ -53,6 +53,9 @@ if ($success_message) {
         <div class="cllf-form-row">
             <div class="cllf-form-group">
                 <label for="loop_color">Loop Color <span class="required">*</span></label>
+                <span class="color-thumbnail">
+                    <img src="<?php echo CLLF_PLUGIN_URL; ?>images/color-thumb.jpg" alt="Loop Colors">
+                </span>
                 <select id="loop_color" name="loop_color" required>
                     <option value="">Select Loop Color</option>
                     <option value="Black">Black</option>
@@ -88,14 +91,20 @@ if ($success_message) {
         <div class="cllf-form-row">
             <div class="cllf-form-group">
                 <label>Sock Clips <span class="required">*</span></label>
-                <div class="cllf-radio-group">
-                    <label>
+                <div class="cllf-radio-group clip-options">
+                    <label class="clip-option">
                         <input type="radio" name="sock_clips" value="Single" required checked>
-                        Single
+                        <span class="option-text">Single</span>
+                        <span class="clip-thumbnail single-clip-thumbnail">
+                            <img src="<?php echo CLLF_PLUGIN_URL; ?>images/single-clip-thumb.jpg" alt="Single Clip">
+                        </span>
                     </label>
-                    <label>
+                    <label class="clip-option">
                         <input type="radio" name="sock_clips" value="Double">
-                        Double
+                        <span class="option-text">Double</span>
+                        <span class="clip-thumbnail double-clip-thumbnail">
+                            <img src="<?php echo CLLF_PLUGIN_URL; ?>images/double-clip-thumb.jpg" alt="Double Clip">
+                        </span>
                     </label>
                 </div>
             </div>
@@ -123,6 +132,17 @@ if ($success_message) {
                 <input type="file" id="logo_file" name="logo_file" accept=".ai,.pdf,.svg,.eps,.png,.jpg,.jpeg">
                 <p class="description">Accepted formats: .ai, .pdf, .svg, .eps, .png, .jpg, .jpeg</p>
                 <div id="logo_preview"></div>
+            </div>
+        </div>
+        
+        <div id="custom-font-container" class="cllf-form-row">
+            <div class="cllf-form-group">
+                <label for="custom_font">Custom Font (Optional)</label>
+                <input type="file" id="custom_font" name="custom_font" accept=".ttf,.otf,.woff,.woff2,.eot,.ps">
+                <p class="description">Upload a custom font file to be used on your tags. By default, we use Jersey M54 for numbers and Arial Black for text.</p>
+                <div class="font-disclaimer">
+                    <strong>Note:</strong> Your custom font will not be reflected in the preview below, but will be applied to your final product.
+                </div>
             </div>
         </div>
 
@@ -181,6 +201,26 @@ if ($success_message) {
             </div>
             <div id="names-list-container" class="cllf-names-list">
                 <!-- Dynamic name fields will be added here by JavaScript -->
+            </div>
+        </div>
+        
+        <div id="text-color-container" class="cllf-form-row">
+            <div class="cllf-form-group">
+                <label for="text_color">Text Color</label>
+                <select id="text_color" name="text_color">
+                    <option value="#000000" data-color="#000000">Black</option>
+                    <!-- Logo colors will be added here dynamically via JavaScript -->
+                    <option value="custom">Custom Color...</option>
+                </select>
+                <div id="color-preview" class="color-preview">
+                    <span style="background-color: #000000;"></span>
+                </div>
+                
+                <div id="custom-color-container" style="display: none; margin-top: 10px;">
+                    <label for="custom_color">Custom Color</label>
+                    <input type="text" id="custom_color" name="custom_color" placeholder="#000000">
+                    <div id="color-picker-container"></div>
+                </div>
             </div>
         </div>
 
@@ -288,4 +328,10 @@ if ($success_message) {
 
         <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('cllf-nonce'); ?>">
     </form>
+    <!-- Scroll to top button -->
+    <button id="scroll-to-top" class="cllf-scroll-top" aria-label="Scroll to top">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+    </button>
 </div>
