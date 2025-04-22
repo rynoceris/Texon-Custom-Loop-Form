@@ -52,6 +52,11 @@ if ($success_message) {
     <form id="cllf-form" class="cllf-form" method="post" enctype="multipart/form-data" action="<?php echo esc_url($_SERVER['REQUEST_URI']); ?>">
         <div class="cllf-form-row">
             <div class="cllf-form-group">
+                <h2>Custom Loop Order Details</h2>
+            </div>
+        </div>
+        <div class="cllf-form-row">
+            <div class="cllf-form-group">
                 <label for="loop_color">Loop Color <span class="required">*</span></label>
                 <span class="color-thumbnail">
                     <img src="<?php echo CLLF_PLUGIN_URL; ?>images/color-thumb.jpg" alt="Loop Colors">
