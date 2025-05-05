@@ -38,6 +38,115 @@
             }, 500);
         });
         
+        // Modal functionality for color thumbnail
+        const colorThumbnail = $('#color-thumbnail-img');
+        const colorModal = $('#color-modal');
+        const modalClose = $('.cllf-modal-close');
+        
+        // Open modal when clicking on the thumbnail
+        colorThumbnail.on('click', function() {
+            // Ensure the modal has the highest z-index on the page
+            colorModal.css('z-index', 9999);
+            $('.cllf-modal-content').css('z-index', 10000);
+            
+            // Force the page header below our modal
+            $('#page-header').css('z-index', 99);
+            
+            colorModal.addClass('show');
+            $('body').addClass('modal-open');
+        });
+        
+        // Close modal when clicking on the close button or outside the modal content
+        modalClose.on('click', function() {
+            closeModal();
+        });
+        
+        colorModal.on('click', function(e) {
+            if ($(e.target).is(colorModal)) {
+                closeModal();
+            }
+        });
+        
+        // Close modal when pressing ESC key
+        $(document).on('keydown', function(e) {
+            if (e.key === 'Escape' && colorModal.hasClass('show')) {
+                closeModal();
+            }
+        });
+        
+        // Function to close the modal
+        function closeModal() {
+            colorModal.removeClass('show');
+            setTimeout(() => {
+                // Restore the original z-index for the header
+                $('#page-header').css('z-index', '');
+                $('body').removeClass('modal-open');
+            }, 300); // Wait for the fade-out animation to complete
+        }
+        
+        // Add shift-click functionality for number checkboxes
+        let lastChecked = null; // Keep track of the last checkbox that was clicked
+        
+        $('.number-checkbox').on('click', function(e) {
+            const $this = $(this);
+            
+            // If shift key is pressed and there's a last checked checkbox
+            if (e.shiftKey && lastChecked !== null) {
+                // Get the current checkbox index and the last checked index
+                const $checkboxes = $('.number-checkbox');
+                const startIndex = $checkboxes.index(lastChecked);
+                const endIndex = $checkboxes.index(this);
+                
+                // Determine the range (either ascending or descending)
+                const start = Math.min(startIndex, endIndex);
+                const end = Math.max(startIndex, endIndex);
+                
+                // Get the checked state from the current checkbox
+                const isChecked = $this.prop('checked');
+                
+                // Apply the same checked state to all checkboxes in the range
+                $checkboxes.slice(start, end + 1).prop('checked', isChecked);
+                
+                // Update the "Select All" checkbox
+                updateSelectAllCheckbox();
+                
+                // Update the order summary and preview
+                updateOrderSummary();
+                updateLoopPreview();
+            }
+            
+            // Save reference to the checkbox that was just clicked
+            lastChecked = this;
+        });
+        
+        // Add visual indicator when shift key is pressed
+        $(document).on('keydown', function(e) {
+            if (e.shiftKey && $('.cllf-numbers-grid').is(':visible')) {
+                $('.cllf-numbers-grid').addClass('shift-key-active');
+            }
+        });
+        
+        $(document).on('keyup', function(e) {
+            if (e.key === 'Shift') {
+                $('.cllf-numbers-grid').removeClass('shift-key-active');
+            }
+        });
+        
+        // Handle font choice dropdown
+        $('#font_choice').on('change', function() {
+            const selectedValue = $(this).val();
+            
+            // Show file upload only when "new" is selected
+            if (selectedValue === 'new') {
+                $('#font-upload-container').slideDown(300);
+            } else {
+                $('#font-upload-container').slideUp(300);
+                // Clear the file input when not using new font
+                $('#custom_font').val('');
+                customFontFile = null;
+            }
+        });
+        
         // Handle logo upload option toggle
         $('input[name="has_logo"]').on('change', function() {
             if ($(this).val() === 'Yes') {
@@ -286,7 +395,7 @@
         });
 
         // Update order summary when form values change
-        $('input[name="num_sets"], #add_blanks').on('change keyup', function() {
+        $('#num_sets, #add_blanks').on('change keyup', function() {
             updateOrderSummary();
             updateLoopPreview();
         });
@@ -349,7 +458,7 @@
             sportWord: $('#sport_word').val(),
             tagInfoType: $('input[name="tag_info_type"]:checked').val(),
             addBlanks: $('#add_blanks').val(),
-            numSets: $('input[name="num_sets"]:checked').val(),
+            numSets: $('#num_sets').val(),
             orderNotes: $('#order_notes').val()
         };
 
@@ -368,6 +477,50 @@
 
         return data;
     }
+    
+    // Process names from textarea
+    $('#names_paste').on('input', function() {
+        validateNamesPaste($(this).val());
+    });
+    
+    /**
+     * Validate names in the paste textarea
+     */
+    function validateNamesPaste(text) {
+        const names = text.split(/[,\n]+/).map(name => name.trim()).filter(name => name);
+        let hasLongNames = false;
+        
+        // Check for names that exceed the limit
+        names.forEach(name => {
+            if (name.length > 20) {
+                hasLongNames = true;
+            }
+        });
+        
+        // Show warning if any names are too long
+        if (hasLongNames) {
+            if (!$('#names-length-warning').length) {
+                $('#names_paste').after('<div id="names-length-warning" class="name-length-warning">Warning: Some names exceed the 20 character limit and will be truncated.</div>');
+            }
+        } else {
+            $('#names-length-warning').remove();
+        }
+    }
+    
+    // Character count for sport word
+    $('#sport_word').on('input', function() {
+        const currentLength = $(this).val().length;
+        $('#sport-word-char-count').text(currentLength);
+        
+        if (currentLength >= 15) {
+            $('#sport-word-char-count').parent().addClass('near-limit');
+        } else {
+            $('#sport-word-char-count').parent().removeClass('near-limit');
+        }
+    });
+    
+    // Initialize character count for sport word
+    $('#sport-word-char-count').text($('#sport_word').val().length);
 
     /**
      * Process names from textarea into individual input fields
@@ -408,7 +561,15 @@
             .attr('type', 'text')
             .attr('name', 'tag_names[]')
             .attr('value', name)
-            .attr('required', true);
+            .attr('maxlength', '20')
+            .attr('required', true)
+            .on('input', function() {
+                updateNameCharCount($(this));
+            });
+        
+        const charCount = $('<div>')
+            .addClass('char-count-container')
+            .html('<span class="name-char-count">0</span>/20 characters');
         
         const removeBtn = $('<button>')
             .attr('type', 'button')
@@ -420,8 +581,26 @@
                 updateLoopPreview();
             });
         
-        nameField.append(input).append(removeBtn);
+        nameField.append(input).append(charCount).append(removeBtn);
         $('#names-list-container').append(nameField);
+        
+        // Initialize the character count
+        updateNameCharCount(input);
+    }
+    
+    /**
+     * Update character count for name fields
+     */
+    function updateNameCharCount(inputField) {
+        const currentLength = inputField.val().length;
+        inputField.siblings('.char-count-container').find('.name-char-count').text(currentLength);
+        
+        // Add visual indicator when approaching limit
+        if (currentLength >= 15) {
+            inputField.siblings('.char-count-container').addClass('near-limit');
+        } else {
+            inputField.siblings('.char-count-container').removeClass('near-limit');
+        }
     }
 
     /**
@@ -445,7 +624,7 @@
             quantity = $('input[name="tag_names[]"]').length;
         }
         
-        const sets = parseInt($('input[name="num_sets"]:checked').val()) || 1;
+        const sets = parseInt($('#num_sets').val()) || 1;
         const blanks = parseInt($('#add_blanks').val()) || 0;
         const loopColor = $('#loop_color').val() || 'Selected color';
         const sockClips = $('input[name="sock_clips"]:checked').val() || 'Single';
@@ -479,7 +658,7 @@
         const tagInfoType = $('input[name="tag_info_type"]:checked').val();
         const sockClips = $('input[name="sock_clips"]:checked').val() || 'Single';
         
-        console.log(`Updating preview: Color=${loopColor}, Clips=${sockClips}, HasLogo=${hasLogo}`);
+        console.log(`Updating preview: Color=${loopColor}, Clips=${sockClips}, HasLogo=${hasLogo}, TagType=${tagInfoType}`);
         
         // Update loop color image if available
         if (loopColor) {
@@ -500,14 +679,20 @@
             // Now formattedColor is accessible here
             console.log(`Formatted color: ${formattedColor}`);
             
-            // Get clip size suffix
-            const clipSize = sockClips === 'Double' ? 'lg' : 'sm';
+            // Determine if we need the large (-lg) or small (-sm) image
+            // Names always use large image, Numbers use small unless Double clips
+            let clipSizeSuffix;
+            if (tagInfoType === 'Names' || sockClips === 'Double') {
+                clipSizeSuffix = 'lg';
+            } else {
+                clipSizeSuffix = 'sm';
+            }
             
             // Try to load a color-specific image
-            colorImage = `${cllfVars.pluginUrl}images/loop-${formattedColor}-${clipSize}.png`;
+            colorImage = `${cllfVars.pluginUrl}images/loop-${formattedColor}-${clipSizeSuffix}.png`;
             
             // Log for debugging
-            console.log(`Attempting to load image: ${colorImage}`);
+            console.log(`Attempting to load image: ${colorImage} (TagType: ${tagInfoType}, Clips: ${sockClips})`);
             
             // Try primary image format
             $.ajax({
@@ -535,7 +720,7 @@
                             console.log(`Failed to load alternative: ${altImage}`);
                             
                             // Try with different extension
-                            const jpgImage = `${cllfVars.pluginUrl}images/loop-${formattedColor}-${clipSize}.jpg`;
+                            const jpgImage = `${cllfVars.pluginUrl}images/loop-${formattedColor}-${clipSizeSuffix}.jpg`;
                             console.log(`Trying JPG format: ${jpgImage}`);
                             
                             $.ajax({
@@ -661,56 +846,60 @@
      * Clear the form and reset to default values
      */
     function clearForm() {
-        // Confirm before clearing
-        if (confirm('Are you sure you want to clear the form? All entered data will be lost.')) {
-            // Reset the form
-            $('#cllf-form')[0].reset();
-            
-            // Clear names list
-            $('#names-list-container').empty();
-            
-            // Clear logo preview and data
-            $('#logo_preview').empty();
-            lastLogoFile = null;
-            
-            // Hide logo upload container
-            $('#logo-upload-container').hide();
-            
-            // Set default values for radio buttons
-            $('input[name="sock_clips"][value="Single"]').prop('checked', true);
-            $('input[name="has_logo"][value="No"]').prop('checked', true);
-            $('input[name="tag_info_type"][value="Numbers"]').prop('checked', true);
-            $('input[name="num_sets"][value="1"]').prop('checked', true);
-            
-            // Show numbers container, hide names container
-            $('#numbers-container').show();
-            $('#names-container').hide();
-            
-            // Uncheck all number checkboxes
-            $('.number-checkbox').prop('checked', false);
-            $('#select-all-numbers').prop('checked', false);
-            
-            // Reset add blanks dropdown
-            $('#add_blanks').val('0');
-            
-            // Reset loop color dropdown
-            $('#loop_color').val('');
-            
-            // Clear order notes
-            $('#order_notes').val('');
-            
-            // Clear any success/error messages
-            $('#cllf-form-messages').removeClass('cllf-error cllf-success').empty();
-            
-            // Update the order summary
-            updateOrderSummary();
-            
-            // Update the loop preview
-            updateLoopPreview();
-            
-            // Focus on the loop color dropdown
-            $('#loop_color').focus();
-        }
+        // Reset the form
+        $('#cllf-form')[0].reset();
+        
+        // Clear names list
+        $('#names-list-container').empty();
+        
+        // Clear logo preview and data
+        $('#logo_preview').empty();
+        lastLogoFile = null;
+        
+        // Hide logo upload container
+        $('#logo-upload-container').hide();
+        
+        // Set default values for radio buttons
+        $('input[name="sock_clips"][value="Single"]').prop('checked', true);
+        $('input[name="has_logo"][value="No"]').prop('checked', true);
+        $('input[name="tag_info_type"][value="Numbers"]').prop('checked', true);
+        
+        // Show numbers container, hide names container
+        $('#numbers-container').show();
+        $('#names-container').hide();
+        
+        // Uncheck all number checkboxes
+        $('.number-checkbox').prop('checked', false);
+        $('#select-all-numbers').prop('checked', false);
+        
+        // Reset add blanks dropdown and num sets
+        $('#add_blanks').val('0');
+        $('#num_sets').val('1');
+        
+        // Reset loop color dropdown
+        $('#loop_color').val('');
+        
+        // Reset font choice
+        $('#font_choice').val('default');
+        $('#font-upload-container').hide();
+        
+        // Clear order notes
+        $('#order_notes').val('');
+        
+        // Clear any success/error messages
+        $('#cllf-form-messages').removeClass('cllf-error cllf-success').empty();
+        
+        // Update the order summary
+        updateOrderSummary();
+        
+        // Update the loop preview
+        updateLoopPreview();
+        
+        // Focus on the loop color dropdown
+        $('#loop_color').focus();
+        
+        // Show the form buttons
+        $('.cllf-button-container').show();
     }
 
     /**
@@ -719,6 +908,7 @@
     function submitForm() {
         const form = $('#cllf-form')[0];
         const formData = new FormData(form);
+        formData.append('font_choice', $('#font_choice').val());
         formData.append('action', 'cllf_submit_form');
         
         // Try to get nonce from the form first
@@ -787,6 +977,10 @@
             contentType: false,
             success: function(response) {
                 if (response.success) {
+                    // Hide the form buttons
+                    $('.cllf-button-container').hide();
+                    
+                    // Show success message with improved options
                     $('#cllf-form-messages')
                         .hide()
                         .addClass('cllf-success')
@@ -794,19 +988,35 @@
                             <div class="cllf-success-content">
                                 <span>Your custom loops have been added to the cart!</span>
                                 <div class="cllf-button-group">
+                                    <button type="button" id="new-order-btn" class="button button-primary">Start a New Loop Order</button>
                                     <button type="button" id="clone-form-btn" class="button button-secondary">Clone with New Color</button>
-                                    <a href="${response.data.cart_url}" class="button">View Cart</a>
+                                    <a href="${response.data.cart_url}" class="button button-secondary">View Cart</a>
                                 </div>
                             </div>
                         `)
                         .fadeIn(500);
                     
+                    // Add event listener to the new order button
+                    $('#new-order-btn').on('click', function() {
+                        clearForm();
+                        // Scroll to the top of the form
+                        $('html, body').animate({
+                            scrollTop: $('#cllf-form').offset().top - 50
+                        }, 500);
+                        // Show the form buttons again
+                        $('.cllf-button-container').show();
+                        // Hide the success message
+                        $('#cllf-form-messages').slideUp(300);
+                    });
+                    
                     // Add event listener to the clone button
                     $('#clone-form-btn').on('click', function() {
                         cloneFormWithNewColor();
+                        // Show the form buttons again
+                        $('.cllf-button-container').show();
                     });
                     
-                    // Reset the form
+                    // Reset the form for a fresh start next time
                     $('#cllf-form')[0].reset();
                     $('#names-list-container').empty();
                     $('#logo_preview').empty();
@@ -979,7 +1189,7 @@
         $('#add_blanks').val(lastFormData.addBlanks);
         
         // Set num sets
-        $(`input[name="num_sets"][value="${lastFormData.numSets}"]`).prop('checked', true);
+        $('#num_sets').val(lastFormData.numSets);
         
         // Set order notes
         if (lastFormData.orderNotes) {
@@ -1002,6 +1212,9 @@
         
         // Update the loop preview
         updateLoopPreview();
+        
+        // Show the form buttons again
+        $('.cllf-button-container').show();
         
         // Hide the success message
         $('#cllf-form-messages').slideUp(300, function() {

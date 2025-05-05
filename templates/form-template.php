@@ -23,19 +23,52 @@ if ($success_message) {
         <div class="cllf-success-content">
             <span>' . esc_html($success_message) . '</span>
             <div class="cllf-button-group">
+                <button type="button" id="new-order-btn" class="button button-primary">Start a New Loop Order</button>
                 <button type="button" id="clone-form-btn" class="button button-secondary">Clone with New Color</button>
-                <a href="' . esc_url(wc_get_cart_url()) . '" class="button">View Cart</a>
+                <a href="' . esc_url(wc_get_cart_url()) . '" class="button button-secondary">View Cart</a>
             </div>
         </div>
     </div>';
     
-    // Add script to handle the clone button click
+    // Add script to handle the button clicks
     echo '<script>
         jQuery(document).ready(function($) {
-            $("#clone-form-btn").on("click", function() {
+            // Hide form buttons when success message is shown
+            $(".cllf-button-container").hide();
+            
+            // New order button
+            $("#new-order-btn").on("click", function() {
+                // Clear the form
+                $("#cllf-form")[0].reset();
+                $("#names-list-container").empty();
+                $("#logo_preview").empty();
+                $("#logo-upload-container").hide();
+                
+                // Show form buttons again
+                $(".cllf-button-container").show();
+                
+                // Hide success message
                 $(this).closest(".cllf-success-message").slideUp(300);
+                
                 // Focus on the color dropdown
                 $("#loop_color").focus();
+                
+                // Scroll to the top of the form
+                $("html, body").animate({
+                    scrollTop: $("#cllf-form").offset().top - 50
+                }, 500);
+            });
+            
+            // Clone button
+            $("#clone-form-btn").on("click", function() {
+                $(this).closest(".cllf-success-message").slideUp(300);
+                
+                // Show form buttons again
+                $(".cllf-button-container").show();
+                
+                // Focus on the color dropdown
+                $("#loop_color").focus();
+                
                 // Scroll to the top of the form
                 $("html, body").animate({
                     scrollTop: $("#cllf-form").offset().top - 50
@@ -58,8 +91,10 @@ if ($success_message) {
         <div class="cllf-form-row">
             <div class="cllf-form-group">
                 <label for="loop_color">Loop Color <span class="required">*</span></label>
+                <!-- In the loop color section, make the thumbnail clickable -->
                 <span class="color-thumbnail">
-                    <img src="<?php echo CLLF_PLUGIN_URL; ?>images/color-thumb.jpg" alt="Loop Colors">
+                    <img src="<?php echo CLLF_PLUGIN_URL; ?>images/color-thumb.jpg" alt="Loop Colors" id="color-thumbnail-img" class="clickable-thumbnail">
+                    <div class="thumbnail-click-hint">Click to enlarge</div>
                 </span>
                 <select id="loop_color" name="loop_color" required>
                     <option value="">Select Strap Color</option>
@@ -117,7 +152,7 @@ if ($success_message) {
 
         <div class="cllf-form-row">
             <div class="cllf-form-group">
-                <label>Logo <span class="required">*</span></label>
+                <label>Add a Logo? <span class="required">*</span></label>
                 <div class="cllf-radio-group">
                     <label>
                         <input type="radio" name="has_logo" value="Yes" required>
@@ -142,11 +177,20 @@ if ($success_message) {
         
         <div id="custom-font-container" class="cllf-form-row">
             <div class="cllf-form-group">
-                <label for="custom_font">Custom Font (Optional)</label>
-                <input type="file" id="custom_font" name="custom_font" accept=".ttf,.otf,.woff,.woff2,.eot,.ps">
-                <p class="description">Upload a custom font file to be used on your tags. By default, we use Jersey M54 for numbers and Arial Black for text.</p>
-                <div class="font-disclaimer">
-                    <strong>Note:</strong> Your custom font will not be reflected in the preview below, but will be applied to your final product.
+                <label for="font_choice">Font Selection</label>
+                <select id="font_choice" name="font_choice">
+                    <option value="default" selected>Use Default Font(s)</option>
+                    <option value="previous">Use Font(s) Previously Provided</option>
+                    <option value="new">I Need to Upload a New Font</option>
+                </select>
+                <p class="description">By default, we use Jersey M54 for numbers and Arial Black for text. You may choose to use your previously submitted custom font or upload a new custom font file above.</p>
+                
+                <div id="font-upload-container" style="display: none; margin-top: 15px;">
+                    <input type="file" id="custom_font" name="custom_font" accept=".ttf,.otf,.woff,.woff2,.eot,.ps">
+                    <p class="description">Upload a custom font file to be used on your tags.</p>
+                    <div class="font-disclaimer">
+                        <strong>Note:</strong> Your custom font will not be reflected in the preview below, but will be applied to your final product.
+                    </div>
                 </div>
             </div>
         </div>
@@ -154,8 +198,11 @@ if ($success_message) {
         <div class="cllf-form-row">
             <div class="cllf-form-group">
                 <label for="sport_word">Sport or Word on Strap</label>
-                <input type="text" id="sport_word" name="sport_word" placeholder="e.g., VOLLEYBALL, PRACTICE, TRAVEL">
-                <p class="description">Example: "VOLLEYBALL" or "PRACTICE" or "TRAVEL"</p>
+                <input type="text" id="sport_word" name="sport_word" maxlength="20" placeholder="Example: 'VOLLEYBALL' or 'PRACTICE' or 'TRAVEL'">
+                <p class="description">Note: For best results, limit to 20 characters</p>
+                <div class="char-count-container">
+                    <span id="sport-word-char-count">0</span>/20 characters
+                </div>
             </div>
         </div>
 
@@ -183,6 +230,7 @@ if ($success_message) {
                         <input type="checkbox" id="select-all-numbers">
                         Select All
                     </label>
+                    <span class="shift-select-hint">Pro tip: Hold SHIFT while clicking to select multiple numbers in a row</span>
                 </div>
                 <div class="cllf-numbers-grid">
                     <?php for ($i = 0; $i <= 150; $i++) : ?>
@@ -243,29 +291,13 @@ if ($success_message) {
 
         <div class="cllf-form-row">
             <div class="cllf-form-group">
-                <label>Number of Sets <span class="required">*</span></label>
-                <div class="cllf-radio-group">
-                    <label>
-                        <input type="radio" name="num_sets" value="1" required checked>
-                        One
-                    </label>
-                    <label>
-                        <input type="radio" name="num_sets" value="2">
-                        Two
-                    </label>
-                    <label>
-                        <input type="radio" name="num_sets" value="3">
-                        Three
-                    </label>
-                    <label>
-                        <input type="radio" name="num_sets" value="4">
-                        Four
-                    </label>
-                    <label>
-                        <input type="radio" name="num_sets" value="5">
-                        Five
-                    </label>
-                </div>
+                <label for="num_sets">Number of Sets <span class="required">*</span></label>
+                <select id="num_sets" name="num_sets" required>
+                    <?php for ($i = 1; $i <= 25; $i++) : ?>
+                        <option value="<?php echo $i; ?>" <?php echo ($i === 1) ? 'selected' : ''; ?>><?php echo $i; ?></option>
+                    <?php endfor; ?>
+                </select>
+                <p class="description">Select how many sets of the selected numbers/names you need.</p>
             </div>
         </div>
 
@@ -339,4 +371,13 @@ if ($success_message) {
             <polyline points="18 15 12 9 6 15"></polyline>
         </svg>
     </button>
+    <!-- Add at the bottom of the form, just before the closing </div> tag -->
+    <!-- Color Modal -->
+    <div id="color-modal" class="cllf-modal">
+        <div class="cllf-modal-content">
+            <span class="cllf-modal-close">&times;</span>
+            <img id="color-modal-img" src="<?php echo CLLF_PLUGIN_URL; ?>images/color-thumb.jpg" alt="Loop Colors">
+            <div class="cllf-modal-caption">Available Loop Colors</div>
+        </div>
+    </div>
 </div>

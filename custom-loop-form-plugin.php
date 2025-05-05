@@ -202,6 +202,10 @@ function cllf_handle_form_submission() {
     $sock_clips = isset($_POST['sock_clips']) ? sanitize_text_field($_POST['sock_clips']) : '';
     $has_logo = isset($_POST['has_logo']) ? sanitize_text_field($_POST['has_logo']) : 'No';
     $sport_word = isset($_POST['sport_word']) ? sanitize_text_field($_POST['sport_word']) : '';
+    // Enforce 20 character limit
+    if (strlen($sport_word) > 20) {
+        $sport_word = substr($sport_word, 0, 20);
+    }
     $tag_info_type = isset($_POST['tag_info_type']) ? sanitize_text_field($_POST['tag_info_type']) : '';
     $tag_numbers = isset($_POST['tag_numbers']) ? array_map('intval', $_POST['tag_numbers']) : array();
     $tag_names = isset($_POST['tag_names']) ? array_map('sanitize_text_field', $_POST['tag_names']) : array();
@@ -211,6 +215,15 @@ function cllf_handle_form_submission() {
     $text_color = isset($_POST['text_color']) ? sanitize_text_field($_POST['text_color']) : '#000000';
     if ($text_color === 'custom' && isset($_POST['custom_color'])) {
         $text_color = sanitize_text_field($_POST['custom_color']);
+    }
+    
+    // For names, enforce 20 character limit on each name
+    if ($tag_info_type === 'Names' && !empty($tag_names)) {
+        foreach ($tag_names as $key => $name) {
+            if (strlen($name) > 20) {
+                $tag_names[$key] = substr($name, 0, 20);
+            }
+        }
     }
     
     // Validate required fields
@@ -275,11 +288,14 @@ function cllf_handle_form_submission() {
         }
     }
     
+    $font_choice = isset($_POST['font_choice']) ? sanitize_text_field($_POST['font_choice']) : 'default';
+    
     // Handle custom font upload if applicable
     $custom_font_url = '';
     $custom_font_name = '';
     
-    if (isset($_FILES['custom_font']) && $_FILES['custom_font']['error'] !== UPLOAD_ERR_NO_FILE) {
+    if ($font_choice === 'new' && isset($_FILES['custom_font']) && $_FILES['custom_font']['error'] !== UPLOAD_ERR_NO_FILE) {
+        // Process the font upload
         $font_file = $_FILES['custom_font'];
         $upload_dir = wp_upload_dir();
         $font_dir = $upload_dir['basedir'] . '/cllf-uploads/fonts';
@@ -323,6 +339,7 @@ function cllf_handle_form_submission() {
         WC()->session->set('cllf_custom_font_url', $custom_font_url);
         WC()->session->set('cllf_custom_font_name', $custom_font_name);
     }
+    WC()->session->set('cllf_font_choice', $font_choice);
     
     // Calculate total number of loops
     $tag_count = ($tag_info_type === 'Numbers') ? count($tag_numbers) : count($tag_names);
@@ -873,6 +890,10 @@ function cllf_save_form_data_to_order($order_id) {
         update_post_meta($order_id, '_cllf_logo_url', sanitize_text_field($logo_url));
     }
     
+    if ($font_choice = WC()->session->get('cllf_font_choice')) {
+        update_post_meta($order_id, '_cllf_font_choice', sanitize_text_field($font_choice));
+    }
+    
     if ($custom_font_url) {
         update_post_meta($order_id, '_cllf_custom_font_url', sanitize_text_field($custom_font_url));
         update_post_meta($order_id, '_cllf_custom_font_name', sanitize_text_field($custom_font_name));
@@ -912,7 +933,6 @@ function cllf_save_form_data_to_order($order_id) {
     
     if ($order_notes = WC()->session->get('cllf_order_notes')) {
         update_post_meta($order_id, '_cllf_order_notes', sanitize_textarea_field($order_notes));
-        WC()->session->__unset('cllf_order_notes');
     }
     
     // Clear session data
@@ -922,6 +942,7 @@ function cllf_save_form_data_to_order($order_id) {
     WC()->session->__unset('cllf_logo_url');
     WC()->session->__unset('cllf_custom_font_url');
     WC()->session->__unset('cllf_custom_font_name');
+    WC()->session->__unset('cllf_font_choice');
     WC()->session->__unset('cllf_sport_word');
     WC()->session->__unset('cllf_tag_info_type');
     WC()->session->__unset('cllf_tag_numbers');
@@ -930,6 +951,7 @@ function cllf_save_form_data_to_order($order_id) {
     WC()->session->__unset('cllf_num_sets');
     WC()->session->__unset('cllf_total_loops');
     WC()->session->__unset('cllf_text_color');
+    WC()->session->__unset('cllf_order_notes');
 }
 
 // Display custom form data in admin order page
@@ -961,6 +983,31 @@ function cllf_display_form_data_in_admin($order) {
                     <a href="<?php echo esc_url(get_post_meta($order_id, '_cllf_logo_url', true)); ?>" target="_blank">
                         <?php _e('View Logo'); ?>
                     </a>
+                </p>
+            <?php endif; ?>
+            <?php if ($font_choice = get_post_meta($order_id, '_cllf_font_choice', true)) : ?>
+                <p>
+                    <strong><?php _e('Font Choice'); ?>:</strong>
+                    <?php
+                    switch ($font_choice) {
+                        case 'default':
+                            echo 'Use Default Font(s)';
+                            break;
+                        case 'previous':
+                            echo 'Use Font(s) Previously Provided';
+                            break;
+                        case 'new':
+                            echo 'Uploaded New Font';
+                            break;
+                        default:
+                            echo esc_html($font_choice);
+                    }
+                    ?>
+                </p>
+            <?php else : ?>
+                <p>
+                    <strong><?php _e('Font Choice'); ?>:</strong>
+                    Use Default Font(s)
                 </p>
             <?php endif; ?>
             <?php if ($custom_font_url = get_post_meta($order_id, '_cllf_custom_font_url', true)) : ?>
@@ -1055,6 +1102,8 @@ function cllf_send_admin_notification($order_id) {
         $text_color = get_post_meta($order_id, '_cllf_text_color', true);
         $custom_font_url = get_post_meta($order_id, '_cllf_custom_font_url', true);
         $custom_font_name = get_post_meta($order_id, '_cllf_custom_font_name', true);
+        $font_choice = get_post_meta($order_id, '_cllf_font_choice', true);
+        $font_choice_text = 'Default Fonts';
         
         $headers[] = "From: Texon Athletic Towel <sales@texontowel.com>" . "\r\n";
         $headers[] = 'Content-Type: text/html; charset=UTF-8';
@@ -1096,11 +1145,25 @@ function cllf_send_admin_notification($order_id) {
             $message .= "<li><strong>Text Color:</strong> " . $text_color . " <span style='display: inline-block; width: 20px; height: 20px; background-color: " . $text_color . "; vertical-align: middle; border: 1px solid #ddd;'></span></li>";
         }
         
-        // Add custom font information if available
-        if ($custom_font_url) {
+        if ($font_choice) {
+            switch ($font_choice) {
+                case 'default':
+                    $font_choice_text = 'Use Default Font(s)';
+                    break;
+                case 'previous':
+                    $font_choice_text = 'Use Font(s) Previously Provided';
+                    break;
+                case 'new':
+                    $font_choice_text = 'Uploaded New Font';
+                    break;
+            }
+        }
+        
+        $message .= "<li><strong>Font Choice:</strong> " . $font_choice_text . "</li>";
+        
+        // If they uploaded a new font and we have the URL
+        if ($font_choice === 'new' && $custom_font_url) {
             $message .= "<li><strong>Custom Font:</strong> <a href='" . esc_url($custom_font_url) . "'>" . esc_html($custom_font_name) . "</a></li>";
-        } else {
-            $message .= "<li><strong>Custom Font:</strong> None (using default fonts)</li>";
         }
             
         if ($order_notes = get_post_meta($order_id, '_cllf_order_notes', true)) {
