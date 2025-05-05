@@ -485,9 +485,20 @@
         if (loopColor) {
             // Define colorImage variable outside the if/else blocks so it's accessible to both
             let colorImage;
+            let formattedColor;
             
-            // Create formatted color string for filename
-            const formattedColor = loopColor.toLowerCase().replace(/\s+/g, '-');
+            if (loopColor == "Tan (Jute)") {
+                // Create formatted color string for filename
+                formattedColor = "tan";
+            } else if (loopColor == "Sky (Light) Blue") {
+                formattedColor = "sky-blue";
+            } else {
+                // Create formatted color string for filename
+                formattedColor = loopColor.toLowerCase().replace(/\s+/g, '-');
+            }
+            
+            // Now formattedColor is accessible here
+            console.log(`Formatted color: ${formattedColor}`);
             
             // Get clip size suffix
             const clipSize = sockClips === 'Double' ? 'lg' : 'sm';

@@ -6,7 +6,7 @@
  * Plugin Name:          Custom Laundry Loops Form
  * Plugin URI:           https://www.texontowel.com
  * Description:          Display a custom form for ordering custom laundry loops directly on the frontend.
- * Version:              1.0.17
+ * Version:              2.0
  * Author:               Texon Towel
  * Author URI:           https://www.texontowel.com
  * Developer:            Texon Towel
@@ -680,10 +680,16 @@ function cllf_process_order_and_add_to_cart($loop_color, $sock_clips, $total_loo
     if ($product_id) {
         // Product exists, update title and add it to the cart
         $product = wc_get_product($product_id);
-        $product->set_name($product_title);
-        $product->save();
-        
-        WC()->cart->add_to_cart($product_id, $total_loops);
+        if ($product) {
+            $product->set_name($product_title);
+            $product->save();
+            
+            // Ensure we use an integer product ID
+            WC()->cart->add_to_cart((int)$product_id, $total_loops);
+        } else {
+            error_log("Failed to load product with ID: $product_id");
+            // Handle error - maybe create a new product instead
+        }
     } else {
         // Product does not exist, create it with the enhanced title
         $product = new WC_Product_Simple();
@@ -707,8 +713,14 @@ function cllf_process_order_and_add_to_cart($loop_color, $sock_clips, $total_loo
         // Save the product
         $new_product_id = $product->save();
         
-        // Add the new product to the cart
-        WC()->cart->add_to_cart($new_product_id, $total_loops);
+        // Verify we have a valid product ID
+        if ($new_product_id && is_numeric($new_product_id) && $new_product_id > 0) {
+            // Cast to int for safety
+            WC()->cart->add_to_cart((int)$new_product_id, $total_loops);
+        } else {
+            error_log("Failed to create new product with SKU: $sku");
+            // Handle the error - perhaps show a message to the user
+        }
     }
     
     // Get sublimation product IDs
@@ -761,34 +773,54 @@ function cllf_process_order_and_add_to_cart($loop_color, $sock_clips, $total_loo
     // 5. Add the correct per-loop sublimation fee
     $per_loop_product_id = ($all_loops < 24) ? $sublimation_product_1 : $sublimation_product_2;
     
-    // Add directly to cart contents
-    $cart_item_key = WC()->cart->generate_cart_id($per_loop_product_id);
+    // Convert to integer
+    $per_loop_product_id = (int)$per_loop_product_id;
+    
+    // Verify the product exists
     $product_data = wc_get_product($per_loop_product_id);
     
-    WC()->cart->cart_contents[$cart_item_key] = array(
-        'key'          => $cart_item_key,
-        'product_id'   => $per_loop_product_id,
-        'variation_id' => 0,
-        'variation'    => array(),
-        'quantity'     => $all_loops,
-        'data'         => $product_data,
-        'data_hash'    => wc_get_cart_item_data_hash($product_data),
-    );
-    
-    // 6. Add setup fee if it wasn't already in the cart
-    if (!$setup_fee_exists) {
-        $cart_item_key = WC()->cart->generate_cart_id($sublimation_product_3);
-        $product_data = wc_get_product($sublimation_product_3);
+    if ($product_data) {
+        // Add directly to cart contents
+        $cart_item_key = WC()->cart->generate_cart_id($per_loop_product_id);
         
         WC()->cart->cart_contents[$cart_item_key] = array(
             'key'          => $cart_item_key,
-            'product_id'   => $sublimation_product_3,
+            'product_id'   => $per_loop_product_id,
             'variation_id' => 0,
             'variation'    => array(),
-            'quantity'     => 1,
+            'quantity'     => $all_loops,
             'data'         => $product_data,
             'data_hash'    => wc_get_cart_item_data_hash($product_data),
         );
+    } else {
+        error_log("Failed to get sublimation product with ID: $per_loop_product_id");
+        // Handle error - sublimation product doesn't exist
+    }
+    
+    // 6. Add setup fee if it wasn't already in the cart
+    if (!$setup_fee_exists) {
+        // Convert to integer
+        $setup_product_id = (int)$sublimation_product_3;
+        
+        // Verify the product exists
+        $product_data = wc_get_product($setup_product_id);
+        
+        if ($product_data) {
+            $cart_item_key = WC()->cart->generate_cart_id($setup_product_id);
+            
+            WC()->cart->cart_contents[$cart_item_key] = array(
+                'key'          => $cart_item_key,
+                'product_id'   => $setup_product_id,
+                'variation_id' => 0,
+                'variation'    => array(),
+                'quantity'     => 1,
+                'data'         => $product_data,
+                'data_hash'    => wc_get_cart_item_data_hash($product_data),
+            );
+        } else {
+            error_log("Failed to get setup fee product with ID: $setup_product_id");
+            // Handle error - setup fee product doesn't exist
+        }
     }
     
     // 7. Save the updated cart
@@ -1026,7 +1058,7 @@ function cllf_send_admin_notification($order_id) {
         
         $headers[] = "From: Texon Athletic Towel <sales@texontowel.com>" . "\r\n";
         $headers[] = 'Content-Type: text/html; charset=UTF-8';
-        $to = array('ryan@texontowel.com', 'stephanie@texontowel.com', 'jen@texontowel.com', 'wmk@texontowel.com');
+        $to = array('ryan@texontowel.com', 'stephanie@texontowel.com', 'jen@texontowel.com', 'wmk@texontowel.com', 'jessica@texontowel.com');
         $subject = 'New Custom Loop Order - #' . $order_id;
         
         $message = "<p>A new Custom Loop Order has been placed on TexonTowel.com!</p>
@@ -1898,7 +1930,7 @@ function cllf_custom_loop_admin_order_notice($order) {
     }
 }
 
-// Add this to your plugin temporarily
+// Utility function to clear the cart for testing
 add_action('init', 'cllf_clear_cart_endpoint');
 function cllf_clear_cart_endpoint() {
     // Only process on a specific URL parameter for security

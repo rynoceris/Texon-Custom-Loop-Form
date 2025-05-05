@@ -76,7 +76,7 @@ function cllf_extract_colors_via_gd($image_path, $num_colors = 5) {
 	$width = $image_info[0];
 	$height = $image_info[1];
 	
-	error_log("Image info: MIME=$mime_type, dimensions=${width}x${height}");
+	error_log("Image info: MIME=$mime_type, dimensions={$width}x{$height}");
 	
 	// Create image resource based on type
 	try {
@@ -106,7 +106,7 @@ function cllf_extract_colors_via_gd($image_path, $num_colors = 5) {
 		$new_width = min($width, 200);
 		$new_height = round(($height * $new_width) / $width);
 		
-		error_log("Resizing to ${new_width}x${new_height} for processing");
+		error_log("Resizing to {$new_width}x{$new_height} for processing");
 		
 		$resized = imagecreatetruecolor($new_width, $new_height);
 		if (!$resized) {

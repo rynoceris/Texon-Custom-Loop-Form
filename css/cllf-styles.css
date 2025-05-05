@@ -44,6 +44,7 @@
     display: block;
     margin-bottom: 5px;
     font-weight: bold;
+    font-size: 22px;
 }
 
 .cllf-form-group input[type="text"],

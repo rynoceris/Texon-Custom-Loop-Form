@@ -52,7 +52,7 @@ if ($success_message) {
     <form id="cllf-form" class="cllf-form" method="post" enctype="multipart/form-data" action="<?php echo esc_url($_SERVER['REQUEST_URI']); ?>">
         <div class="cllf-form-row">
             <div class="cllf-form-group">
-                <h2>Custom Loop Order Details</h2>
+                <h2>Custom Strap Order Details</h2>
             </div>
         </div>
         <div class="cllf-form-row">
@@ -62,7 +62,7 @@ if ($success_message) {
                     <img src="<?php echo CLLF_PLUGIN_URL; ?>images/color-thumb.jpg" alt="Loop Colors">
                 </span>
                 <select id="loop_color" name="loop_color" required>
-                    <option value="">Select Loop Color</option>
+                    <option value="">Select Strap Color</option>
                     <option value="Black">Black</option>
                     <option value="Bone">Bone</option>
                     <option value="Brown">Brown</option>
@@ -83,7 +83,7 @@ if ($success_message) {
                     <option value="Royal Blue">Royal Blue</option>
                     <option value="Sky (Light) Blue">Sky (Light) Blue</option>
                     <option value="Sun Gold">Sun Gold</option>
-                    <option value="Tan (Jute)">Tan (Jute)</option>
+                    <option value="Tan (Jute)">Tan (Old Gold)</option>
                     <option value="Teal">Teal</option>
                     <option value="Turquoise">Turquoise</option>
                     <option value="Violet">Violet</option>
