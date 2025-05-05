@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Custom Laundry Loops Form - WordPress Plugin</title>
+	<style>
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+			color: #444;
+			max-width: 800px;
+			margin: 0 auto;
+			padding: 20px;
+		}
+		h1 {
+			color: #23282d;
+			border-bottom: 1px solid #eee;
+			padding-bottom: 10px;
+		}
+		h2 {
+			color: #23282d;
+			font-size: 1.4em;
+			margin-top: 30px;
+		}
+		h3 {
+			color: #23282d;
+			font-size: 1.2em;
+		}
+		.plugin-info {
+			background-color: #f9f9f9;
+			padding: 15px;
+			border-radius: 5px;
+			margin-bottom: 20px;
+		}
+		.plugin-info p {
+			margin: 5px 0;
+		}
+		.changelog-item {
+			margin-bottom: 30px;
+		}
+		.changelog-item h3 {
+			background-color: #f0f0f0;
+			padding: 8px 12px;
+			border-radius: 4px;
+			margin-bottom: 10px;
+		}
+		ul {
+			margin-left: 20px;
+		}
+		.footer {
+			margin-top: 50px;
+			padding-top: 20px;
+			border-top: 1px solid #eee;
+			font-size: 0.9em;
+			color: #777;
+		}
+	</style>
+</head>
+<body>
+	<h1>Custom Laundry Loops Form</h1>
+	
+	<div class="plugin-info">
+		<p><strong>Contributors:</strong> Texon Towel, Ryan Ours</p>
+		<p><strong>Tags:</strong> custom, laundry loops, woocommerce</p>
+		<p><strong>Requires WordPress:</strong> 6.5+</p>
+		<p><strong>Tested up to:</strong> Unknown</p>
+		<p><strong>Requires WooCommerce:</strong> 8.8.x+</p>
+		<p><strong>Tested up to:</strong> Unknown</p>
+		<p><strong>Requires PHP:</strong> 8.1</p>
+		<p><strong>Tested up to:</strong> 8.2.28</p>
+		<p><strong>Stable tag:</strong> 2.1</p>
+		<p><strong>License:</strong> GPLv3 or later</p>
+		<p><strong>License URI:</strong> <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">https://www.gnu.org/licenses/gpl-3.0.en.html</a></p>
+	</div>
+	
+	<h2>Description</h2>
+	<p>The Custom Laundry Loops Form plugin allows customers to order custom laundry loops with various options directly from your WooCommerce store. It provides a user-friendly form with color selection, clip types, and personalization options.</p>
+	
+	<h2>Features</h2>
+	<ul>
+		<li>Color selection with visual preview</li>
+		<li>Single and double clip options</li>
+		<li>Logo upload capability (JPG, PNG, SVG, PDF, AI formats)</li>
+		<li>Custom text for loops</li>
+		<li>Numbers or names on loops</li>
+		<li>Multiple quantity options</li>
+		<li>Custom font selection</li>
+		<li>Text color customization</li>
+		<li>Live preview of loops</li>
+		<li>Direct integration with WooCommerce cart and checkout</li>
+	</ul>
+	
+	<h2>Installation</h2>
+	<ol>
+		<li>Upload the plugin files to the <code>/wp-content/plugins/custom-laundry-loops-form</code> directory</li>
+		<li>Activate the plugin through the 'Plugins' menu in WordPress</li>
+		<li>Place the shortcode <code>[custom_laundry_loops_form]</code> on any page where you want the form to appear</li>
+	</ol>
+	
+	<h2>Frequently Asked Questions</h2>
+	
+	<h3>How do I display the form?</h3>
+	<p>Use the shortcode <code>[custom_laundry_loops_form]</code> on any page.</p>
+	
+	<h3>Can customers upload their own logos?</h3>
+	<p>Yes, the form includes an option for logo upload in various formats including PNG, JPG, SVG, AI, and PDF.</p>
+	
+	<h2>Changelog</h2>
+    <div class="changelog-item">
+        <h3>Version 2.1 - May 5, 2025</h3>
+        <ul>
+            <li>v2.1 updates - See notes</li>
+            <li>QUESTION FONT: Please make the font larger for all form questions (22px). I think it&#039;s easy to skip over a question because the font is kind of small/similar to the notes on the rest of the form.</li>
+            <li>This has been done, and was a great recommendation!</li>
+            <li>STRAP COLOR REFERENCE PHOTO - can you make it clickable to zoom/enlarge? Or maybe have a link that says &quot;Click here for color reference&quot; that would bring up this photo.</li>
+            <li>This has been implemented, let me know if you see anything that should be changed!</li>
+            <li>STRAP COLOR: Update the color &quot;Tan (Jute)&quot; to &quot;Tan (Old Gold)&quot;</li>
+            <li>This is done</li>
+            <li>SPORT OR WORD QUESTION: Change the example text in the &quot;Sport or Word on Strap&quot; field to say &quot;Example: &quot;VOLLEYBALL&quot; or &quot;PRACTICE&quot; or &quot;TRAVEL&quot; and then change the note below the field to say &quot;Note: For best results, limit to 20 characters&quot;</li>
+            <li>This is done. I actually limited the text entry limit for this question and the &quot;Names&quot; fields to be no more than 20 characters. The customer will see a character count, and messaging about this max limit.</li>
+            <li>NUMBERS: Is there any way to make this section work so that when choosing numbers, you can hold Shift and select multiples? Not a major concern, but it would be nice!</li>
+            <li>Yes! This was a great suggestion and has been implemented.</li>
+            <li>FONT PICKER: I&#039;m glad to hear that PlayerKits is on board with the customer adding their own fonts! I think there will be some schools that have already uploaded their font, and they just want us to use it - can you add an option for the customer to indicate &quot;Use Font Previously Provided&quot; and &quot;I Need to Upload a New Font&quot; (which would then allow the file upload) or something like that...</li>
+            <li>I have included a new dropdown for this question with the options &quot;Use Default Font(s)&quot;, &quot;Use Font(s) Previously Provided&quot;, and &quot;I Need to Upload a New Font&quot;. The custom font upload field is only displayed if the customer selects &quot;I Need to Upload a New Font&quot; from the dropdown. Also improved the field hints/messages.</li>
+            <li>FONT COLOR: In the font color picker section, is it better to just have a field where the customer can type in the color? This is really cool functionality, but I think it might be overly complicated. Whatever the color is, it is likely going to be one that references the color in the logo - which PlayerKits can sample. I worry that having Hex codes and RGB will be too overwhelming for many of our customers. What do you think?</li>
+            <li>This is a tough one. On one hand, I would think that they would know the proper CMYK, RGB or HEX value for their school or team&#039;s colors. But on the other hand, I see your point, and some people ordering may be less informed or know these values. Since I&#039;ve already coded this, let&#039;s give it a shot as-is for awhile and see how customers interact with it.</li>
+            <li>On a side note, did you notice that if you upload a logo file, it extracts the colors from the image and presents them as options for the font color? Do you like this part of the functionality?</li>
+            <li>NUMBER OF SETS: Jen thinks we should add more options to the &quot;Number of Sets&quot; question. Maybe make this a dropdown like you have the &quot;Blanks&quot; question.</li>
+            <li>I have changed this to be a dropdown, with the numbers 1-25 as options. Let me know if I need to add more options here.</li>
+            <li>LOOP PREVIEW: Jen was concerned about this (Wayne absolutely LOVES this functionality, so it&#039;s definitely staying!) but I&#039;m fine to keep it. If customers are confused by it, we might consider taking it down at a later date. That said, I think we need to: Make the disclaimer text &quot;Preview is for visualization purposes only. Actual product may vary slightly&quot; larger and RED.</li>
+            <li>I made this 16px and red, great suggestion.</li>
+            <li>It might have been too crazy to do, but I thought you said you could change the preview to show the shorter tag image for Numbers and the larger tag image for Names. Not a huge deal, just asking!</li>
+            <li>I have now implemented this functionality as follows:</li>
+            <li>If the customer selects &quot;Names&quot;, a large loop preview image is shown (regardless of whether they selected a &quot;Single&quot; or &quot;Double&quot; clip above).</li>
+            <li>If the customer selects &quot;Numbers&quot;, a small loop preview image is shown for &quot;Single&quot; clip loops, and a large loop preview image is shown for &quot;Double&quot; clip loops.</li>
+            <li>Let me know if you need/want any changes to this logic/functionality</li>
+            <li>ADD TO CART / CHECKOUT / NEXT STEPS: This section keeps confusing me and I&#039;m getting caught up here. I think it&#039;s because I already pressed &quot;Add to Cart&quot; so it kind of seems like it didn&#039;t work. Let&#039;s try this: After adding an order to the cart, can you: Hide the &quot;Clear Form&quot; and &quot;Add to Cart&quot; buttons above the success message, as well as:</li>
+            <li>Great suggestion, these are now hidden after clicking the &quot;Add to Cart&quot; button.</li>
+            <li>Include another green button to the left that says &quot;Start a New Loop Order&quot; - this button would essentially clear the form and take them to the top.  What do you think?</li>
+            <li>Also a great suggestion, this has been implemented as well as a &quot;View Cart&quot; button that can take them to their cart. I also added success messaging that says &quot;Your custom loops have been added to the cart!&quot;.</li>
+            <li>MINIMUM ORDER FEE: Jen mentioned a &quot;Minimum Order Fee&quot; for orders under 30. Does this form/process account for that?</li>
+            <li>I implemented this the way that Wayne asked me to. He asked me to do the following:</li>
+            <li>If the customer orders less than 24 loops, the per-product sublimation fee is $3.95/ea</li>
+            <li>If the customer orders 24 or more loops, the per-product sublimation fee is $1.95/ea</li>
+            <li>If this is different than what Jen wants or is expecting, please ask her to consult Wayne about this. If they decide together to make a change, I&#039;ll update the code to match.</li>
+        </ul>
+    </div>
+
+    <div class="changelog-item">
+        <h3>Version 2.0.2 - May 5, 2025</h3>
+        <ul>
+            <li>Most recent version</li>
+        </ul>
+    </div>
+
+    <div class="changelog-item">
+        <h3>Version 2.0.1 - April 22, 2025</h3>
+        <ul>
+            <li>Added form title</li>
+        </ul>
+    </div>
+
+    <div class="changelog-item">
+        <h3>Version 2.0 - April 22, 2025</h3>
+        <ul>
+            <li>Major update to version 2.0</li>
+            <li>Now supports:</li>
+            <li>Dynamically updated preview</li>
+            <li>Custom font upload</li>
+            <li>Font color selection from uploaded logo file</li>
+            <li>More bad-ass-ness!</li>
+        </ul>
+    </div>
+
+    <div class="changelog-item">
+        <h3>Version 1.0 - April 15, 2025</h3>
+        <ul>
+            <li>Initial Commit</li>
+        </ul>
+    </div>
+	
+	<div class="footer">
+		<p>© 2025 Texon Towel - Custom Laundry Loops Form Plugin</p>
+	</div>
+</body>
+</html>

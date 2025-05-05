@@ -6,16 +6,16 @@
  * Plugin Name:          Custom Laundry Loops Form
  * Plugin URI:           https://www.texontowel.com
  * Description:          Display a custom form for ordering custom laundry loops directly on the frontend.
- * Version:              2.0
+ * Version:              2.2
  * Author:               Texon Towel
  * Author URI:           https://www.texontowel.com
- * Developer:            Texon Towel
+ * Developer:            Ryan Ours
  * Copyright:            © 2025 Texon Towel (email : sales@texontowel.com).
  * License: GNU          General Public License v3.0
  * License URI:          http://www.gnu.org/licenses/gpl-3.0.html
- * Tested up to:         6.6.2
- * WooCommerce:          9.4.1
- * PHP tested up to:     8.2.24
+ * Tested up to:         6.8.1
+ * WooCommerce:          9.8.3
+ * PHP tested up to:     8.2.28
  */
 
 if (!defined('ABSPATH')) {
@@ -121,6 +121,9 @@ function cllf_activate() {
     }
 }
 register_activation_hook(__FILE__, 'cllf_activate');
+
+// Include helper functions
+require_once CLLF_PLUGIN_DIR . 'includes/helper-functions.php';
 
 // Include the form template
 function cllf_form_shortcode() {
@@ -2022,3 +2025,169 @@ function cllf_clear_cart_endpoint() {
         }
     }
 }
+
+/**
+ * GitHub Personal Access Token Integration
+ * 
+ * These functions handle securely storing and retrieving a GitHub token
+ * for use with the Custom Laundry Loops Form plugin.
+ */
+
+/**
+ * Register settings for GitHub token
+ */
+function cllf_register_github_settings() {
+    register_setting(
+        'cllf_github_settings_group',
+        'cllf_github_token',
+        array(
+            'type' => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default' => '',
+        )
+    );
+}
+add_action('admin_init', 'cllf_register_github_settings');
+
+/**
+ * Add GitHub settings submenu page
+ */
+function cllf_add_github_settings_page() {
+    add_submenu_page(
+        'options-general.php',
+        'GitHub Integration Settings',
+        'GitHub Settings',
+        'manage_options',
+        'cllf-github-settings',
+        'cllf_github_settings_page'
+    );
+}
+add_action('admin_menu', 'cllf_add_github_settings_page');
+
+/**
+ * Render GitHub settings page
+ */
+function cllf_github_settings_page() {
+    ?>
+    <div class="wrap">
+        <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
+        <form method="post" action="options.php">
+            <?php settings_fields('cllf_github_settings_group'); ?>
+            <?php do_settings_sections('cllf_github_settings_group'); ?>
+            
+            <table class="form-table">
+                <tr valign="top">
+                    <th scope="row">GitHub Personal Access Token</th>
+                    <td>
+                        <input type="password" name="cllf_github_token" value="<?php echo esc_attr(get_option('cllf_github_token')); ?>" class="regular-text" />
+                        <p class="description">Enter your GitHub Personal Access Token. This is stored securely in the WordPress database.</p>
+                    </td>
+                </tr>
+            </table>
+            
+            <?php submit_button(); ?>
+        </form>
+    </div>
+    <?php
+}
+
+/**
+ * Modify the settings saving process to encrypt the token
+ */
+add_filter('pre_update_option_cllf_github_token', function($value, $old_value) {
+    // Only encrypt if the value has changed and is not empty
+    if ($value !== $old_value && !empty($value)) {
+        return cllf_encrypt_token($value);
+    }
+    return $value;
+}, 10, 2);
+
+/**
+ * Register function to generate readme.html when visiting plugins page
+ */
+add_action('admin_init', 'cllf_maybe_generate_readme');
+
+function cllf_maybe_generate_readme() {
+    // Only run on the plugins page
+    if (!is_admin() || !isset($_SERVER['PHP_SELF']) || basename($_SERVER['PHP_SELF']) !== 'plugins.php') {
+        return;
+    }
+    
+    // Only regenerate readme once per session to prevent overhead
+    if (get_transient('cllf_readme_generated')) {
+        return;
+    }
+    
+    // Set a transient so we don't regenerate the readme too frequently
+    set_transient('cllf_readme_generated', true, HOUR_IN_SECONDS);
+    
+    // Path to the generate-readme.php script
+    $readme_generator = CLLF_PLUGIN_DIR . 'generate-readme.php';
+    
+    // Check if the generator script exists
+    if (file_exists($readme_generator)) {
+        // Define debug constant (false to disable debug output)
+        if (!defined('CLLF_DEBUG')) {
+            define('CLLF_DEBUG', false);
+        }
+        
+        // Include the script which defines the functions but doesn't run
+        require_once($readme_generator);
+        
+        // Run readme generation process but capture any output
+        ob_start();
+        try {
+            // GitHub repository information
+            $github_username = 'rynoceris';
+            $github_repo = 'Texon-Custom-Loop-Form';
+            $github_token = cllf_get_github_token();
+            
+            // Get environment versions directly from WordPress
+            $env_versions = [
+                'wordpress' => get_bloginfo('version'),
+                'woocommerce' => defined('WC_VERSION') ? WC_VERSION : 'Unknown',
+                'php' => phpversion()
+            ];
+            
+            // Get commits and generate readme
+            $commits = get_commits($github_username, $github_repo, $github_token);
+            $versions = create_version_entries($commits);
+            $html = generate_html($versions, $env_versions);
+            
+            // Save the HTML to a file
+            file_put_contents(CLLF_PLUGIN_DIR . 'readme.html', $html);
+           
+        } catch (Exception $e) {
+            // Log error but continue
+            error_log('Error generating readme.html: ' . $e->getMessage());
+        }
+        // Discard any output
+        ob_end_clean();
+    }
+}
+
+/**
+ * Add "View details" link to plugin page
+ */
+add_filter(
+    'plugin_row_meta',
+    function( $plugin_meta, $plugin_file, $plugin_data ) {
+        // Check if this is our plugin by comparing the plugin basename
+        if ( 'custom-laundry-loops-form/custom-loop-form-plugin.php' === $plugin_file ) {
+            // Link to the readme.html file
+            $url = plugins_url( 'readme.html', __FILE__ );
+
+            // Add the "View details" link
+            $plugin_meta[] = sprintf(
+                '<a href="%s" class="thickbox open-plugin-details-modal" aria-label="%s" data-title="%s">%s</a>',
+                add_query_arg( 'TB_iframe', 'true', $url ),
+                esc_attr( sprintf( __( 'More information about %s', 'custom-laundry-loops-form' ), $plugin_data['Name'] ) ),
+                esc_attr( $plugin_data['Name'] ),
+                __( 'View details', 'custom-laundry-loops-form' )
+            );
+        }
+        return $plugin_meta;
+    },
+    10,
+    3
+);
