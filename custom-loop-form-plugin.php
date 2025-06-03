@@ -1787,6 +1787,8 @@ function cllf_add_custom_loop_gateway($gateways) {
 add_action('plugins_loaded', 'cllf_init_custom_loop_gateway');
 function cllf_init_custom_loop_gateway() {
     class CLLF_Custom_Loop_Gateway extends WC_Payment_Gateway {
+        public $instructions;
+        
         public function __construct() {
             $this->id = 'cllf_custom_loop_gateway';
             $this->icon = '';

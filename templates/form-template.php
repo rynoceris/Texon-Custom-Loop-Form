@@ -93,7 +93,7 @@ if ($success_message) {
                 <label for="loop_color">Loop Color <span class="required">*</span></label>
                 <!-- In the loop color section, make the thumbnail clickable -->
                 <span class="color-thumbnail">
-                    <img src="<?php echo CLLF_PLUGIN_URL; ?>images/color-thumb.jpg" alt="Loop Colors" id="color-thumbnail-img" class="clickable-thumbnail">
+                    <img src="<?php echo CLLF_PLUGIN_URL; ?>images/color-thumb2.jpg?v=2" alt="Loop Colors" id="color-thumbnail-img" class="clickable-thumbnail">
                     <div class="thumbnail-click-hint">Click to enlarge</div>
                 </span>
                 <select id="loop_color" name="loop_color" required>
@@ -376,7 +376,7 @@ if ($success_message) {
     <div id="color-modal" class="cllf-modal">
         <div class="cllf-modal-content">
             <span class="cllf-modal-close">&times;</span>
-            <img id="color-modal-img" src="<?php echo CLLF_PLUGIN_URL; ?>images/color-thumb.jpg" alt="Loop Colors">
+            <img id="color-modal-img" src="<?php echo CLLF_PLUGIN_URL; ?>images/color-thumb2.jpg?v=2" alt="Loop Colors">
             <div class="cllf-modal-caption">Available Loop Colors</div>
         </div>
     </div>
