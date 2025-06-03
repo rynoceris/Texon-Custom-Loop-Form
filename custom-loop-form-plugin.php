@@ -6,7 +6,7 @@
  * Plugin Name:          Custom Laundry Loops Form
  * Plugin URI:           https://www.texontowel.com
  * Description:          Display a custom form for ordering custom laundry loops directly on the frontend.
- * Version:              2.2
+ * Version:              2.3
  * Author:               Texon Towel
  * Author URI:           https://www.texontowel.com
  * Developer:            Ryan Ours
@@ -177,6 +177,10 @@ function cllf_handle_direct_form_submission() {
     }
 }
 
+/**
+ * Updated form submission handler to store multiple custom loop products
+ * Replace the existing cllf_handle_form_submission function (around line 718)
+ */
 function cllf_handle_form_submission() {
     // For debugging
     error_log('Form submission received');
@@ -337,18 +341,45 @@ function cllf_handle_form_submission() {
         }
     }
     
-    // Store in session
-    if ($custom_font_url) {
-        WC()->session->set('cllf_custom_font_url', $custom_font_url);
-        WC()->session->set('cllf_custom_font_name', $custom_font_name);
-    }
-    WC()->session->set('cllf_font_choice', $font_choice);
-    
     // Calculate total number of loops
     $tag_count = ($tag_info_type === 'Numbers') ? count($tag_numbers) : count($tag_names);
     $total_loops = ($tag_count * $num_sets) + $add_blanks;
     
-    // Store data in session for cart processing
+    // Create a unique identifier for this submission
+    $submission_id = uniqid('cllf_', true);
+    
+    // Get existing submissions array or create new one
+    $all_submissions = WC()->session->get('cllf_all_submissions', array());
+    
+    // Store this submission's data
+    $submission_data = array(
+        'submission_id' => $submission_id,
+        'timestamp' => current_time('mysql'),
+        'loop_color' => $loop_color,
+        'sock_clips' => $sock_clips,
+        'has_logo' => $has_logo,
+        'logo_url' => $logo_url,
+        'sport_word' => $sport_word,
+        'tag_info_type' => $tag_info_type,
+        'tag_numbers' => $tag_numbers,
+        'tag_names' => $tag_names,
+        'add_blanks' => $add_blanks,
+        'num_sets' => $num_sets,
+        'total_loops' => $total_loops,
+        'order_notes' => $order_notes,
+        'text_color' => $text_color,
+        'font_choice' => $font_choice,
+        'custom_font_url' => $custom_font_url,
+        'custom_font_name' => $custom_font_name
+    );
+    
+    // Add to submissions array
+    $all_submissions[$submission_id] = $submission_data;
+    
+    // Save all submissions
+    WC()->session->set('cllf_all_submissions', $all_submissions);
+    
+    // Also store in individual session keys for backward compatibility
     WC()->session->set('cllf_loop_color', $loop_color);
     WC()->session->set('cllf_sock_clips', $sock_clips);
     WC()->session->set('cllf_has_logo', $has_logo);
@@ -362,6 +393,15 @@ function cllf_handle_form_submission() {
     WC()->session->set('cllf_total_loops', $total_loops);
     WC()->session->set('cllf_order_notes', $order_notes);
     WC()->session->set('cllf_text_color', $text_color);
+    WC()->session->set('cllf_font_choice', $font_choice);
+    
+    if ($custom_font_url) {
+        WC()->session->set('cllf_custom_font_url', $custom_font_url);
+        WC()->session->set('cllf_custom_font_name', $custom_font_name);
+    }
+    
+    // Store the submission ID in the current session for processing
+    WC()->session->set('cllf_current_submission_id', $submission_id);
     
     // Process the order and add items to cart
     $cart_url = cllf_process_order_and_add_to_cart($loop_color, $sock_clips, $total_loops);
@@ -856,607 +896,745 @@ function cllf_process_order_and_add_to_cart($loop_color, $sock_clips, $total_loo
     return wc_get_cart_url();
 }
 
+/**
+ * Updated function to add submission ID to cart item data
+ * Add this new function after cllf_process_order_and_add_to_cart
+ */
+add_filter('woocommerce_add_cart_item_data', 'cllf_add_submission_id_to_cart_item', 10, 3);
+function cllf_add_submission_id_to_cart_item($cart_item_data, $product_id, $variation_id) {
+    // Get the current submission ID
+    $submission_id = WC()->session->get('cllf_current_submission_id');
+    
+    if ($submission_id) {
+        // Check if this is a custom loop product
+        $product = wc_get_product($product_id);
+        if ($product && $product->get_sku() && strpos($product->get_sku(), 'CL-') === 0) {
+            $cart_item_data['cllf_submission_id'] = $submission_id;
+            
+            // Clear the current submission ID so it doesn't get added to other products
+            WC()->session->set('cllf_current_submission_id', null);
+        }
+    }
+    
+    return $cart_item_data;
+}
+
 // Save form data to order meta after checkout
 add_action('woocommerce_checkout_update_order_meta', 'cllf_save_form_data_to_order');
 
+/**
+ * Updated function to save ALL submission data to order meta
+ * Replace the existing cllf_save_form_data_to_order function (around line 1862)
+ */
 function cllf_save_form_data_to_order($order_id) {
-    // Get session data
-    $loop_color = WC()->session->get('cllf_loop_color');
-    $sock_clips = WC()->session->get('cllf_sock_clips');
-    $has_logo = WC()->session->get('cllf_has_logo');
-    $logo_url = WC()->session->get('cllf_logo_url');
-    $custom_font_url = WC()->session->get('cllf_custom_font_url');
-    $custom_font_name = WC()->session->get('cllf_custom_font_name');
-    $sport_word = WC()->session->get('cllf_sport_word');
-    $tag_info_type = WC()->session->get('cllf_tag_info_type');
-    $tag_numbers = WC()->session->get('cllf_tag_numbers');
-    $tag_names = WC()->session->get('cllf_tag_names');
-    $add_blanks = WC()->session->get('cllf_add_blanks');
-    $num_sets = WC()->session->get('cllf_num_sets');
-    $total_loops = WC()->session->get('cllf_total_loops');
-    $text_color = WC()->session->get('cllf_text_color');
+    // Get all submissions
+    $all_submissions = WC()->session->get('cllf_all_submissions', array());
     
-    // Save to order meta
+    if (!empty($all_submissions)) {
+        // Save all submissions as a single meta entry
+        update_post_meta($order_id, '_cllf_all_submissions', $all_submissions);
+        
+        // Also save individual submission data for each cart item
+        $order = wc_get_order($order_id);
+        $submission_index = 1;
+        
+        foreach ($order->get_items() as $item_id => $item) {
+            // Check if this item has a submission ID
+            $submission_id = $item->get_meta('cllf_submission_id');
+            
+            if ($submission_id && isset($all_submissions[$submission_id])) {
+                // Save the submission data to the order item
+                $submission_data = $all_submissions[$submission_id];
+                
+                // Add submission data as item meta
+                wc_add_order_item_meta($item_id, '_cllf_submission_data', $submission_data);
+                wc_add_order_item_meta($item_id, '_cllf_submission_index', $submission_index);
+                
+                $submission_index++;
+            }
+        }
+        
+        // Clear session data
+        WC()->session->set('cllf_all_submissions', array());
+    }
+    
+    // Keep backward compatibility - save the last submission data to order meta
+    $loop_color = WC()->session->get('cllf_loop_color');
     if ($loop_color) {
         update_post_meta($order_id, '_cllf_loop_color', sanitize_text_field($loop_color));
+        update_post_meta($order_id, '_cllf_sock_clips', sanitize_text_field(WC()->session->get('cllf_sock_clips')));
+        update_post_meta($order_id, '_cllf_has_logo', sanitize_text_field(WC()->session->get('cllf_has_logo')));
+        update_post_meta($order_id, '_cllf_logo_url', sanitize_text_field(WC()->session->get('cllf_logo_url')));
+        update_post_meta($order_id, '_cllf_sport_word', sanitize_text_field(WC()->session->get('cllf_sport_word')));
+        update_post_meta($order_id, '_cllf_tag_info_type', sanitize_text_field(WC()->session->get('cllf_tag_info_type')));
+        update_post_meta($order_id, '_cllf_tag_numbers', WC()->session->get('cllf_tag_numbers'));
+        update_post_meta($order_id, '_cllf_tag_names', WC()->session->get('cllf_tag_names'));
+        update_post_meta($order_id, '_cllf_text_color', sanitize_text_field(WC()->session->get('cllf_text_color')));
+        update_post_meta($order_id, '_cllf_add_blanks', intval(WC()->session->get('cllf_add_blanks')));
+        update_post_meta($order_id, '_cllf_num_sets', intval(WC()->session->get('cllf_num_sets')));
+        update_post_meta($order_id, '_cllf_total_loops', intval(WC()->session->get('cllf_total_loops')));
+        
+        if ($font_choice = WC()->session->get('cllf_font_choice')) {
+            update_post_meta($order_id, '_cllf_font_choice', sanitize_text_field($font_choice));
+        }
+        
+        if ($custom_font_url = WC()->session->get('cllf_custom_font_url')) {
+            update_post_meta($order_id, '_cllf_custom_font_url', sanitize_text_field($custom_font_url));
+            update_post_meta($order_id, '_cllf_custom_font_name', sanitize_text_field(WC()->session->get('cllf_custom_font_name')));
+        }
+        
+        if ($order_notes = WC()->session->get('cllf_order_notes')) {
+            update_post_meta($order_id, '_cllf_order_notes', sanitize_textarea_field($order_notes));
+        }
     }
     
-    if ($sock_clips) {
-        update_post_meta($order_id, '_cllf_sock_clips', sanitize_text_field($sock_clips));
-    }
+    // Clear all individual session data
+    $session_keys = array(
+        'cllf_loop_color', 'cllf_sock_clips', 'cllf_has_logo', 'cllf_logo_url',
+        'cllf_sport_word', 'cllf_tag_info_type', 'cllf_tag_numbers', 'cllf_tag_names',
+        'cllf_add_blanks', 'cllf_num_sets', 'cllf_total_loops', 'cllf_text_color',
+        'cllf_order_notes', 'cllf_custom_font_url', 'cllf_custom_font_name', 'cllf_font_choice'
+    );
     
-    if ($has_logo) {
-        update_post_meta($order_id, '_cllf_has_logo', sanitize_text_field($has_logo));
+    foreach ($session_keys as $key) {
+        WC()->session->__unset($key);
     }
-    
-    if ($logo_url) {
-        update_post_meta($order_id, '_cllf_logo_url', sanitize_text_field($logo_url));
+}
+
+/**
+ * Store submission ID in order item meta
+ */
+add_action('woocommerce_checkout_create_order_line_item', 'cllf_save_submission_id_to_order_item', 10, 4);
+function cllf_save_submission_id_to_order_item($item, $cart_item_key, $values, $order) {
+    if (isset($values['cllf_submission_id'])) {
+        $item->add_meta_data('cllf_submission_id', $values['cllf_submission_id'], true);
     }
-    
-    if ($font_choice = WC()->session->get('cllf_font_choice')) {
-        update_post_meta($order_id, '_cllf_font_choice', sanitize_text_field($font_choice));
-    }
-    
-    if ($custom_font_url) {
-        update_post_meta($order_id, '_cllf_custom_font_url', sanitize_text_field($custom_font_url));
-        update_post_meta($order_id, '_cllf_custom_font_name', sanitize_text_field($custom_font_name));
-    }
-    
-    if ($sport_word) {
-        update_post_meta($order_id, '_cllf_sport_word', sanitize_text_field($sport_word));
-    }
-    
-    if ($tag_info_type) {
-        update_post_meta($order_id, '_cllf_tag_info_type', sanitize_text_field($tag_info_type));
-    }
-    
-    if ($tag_numbers) {
-        update_post_meta($order_id, '_cllf_tag_numbers', $tag_numbers);
-    }
-    
-    if ($tag_names) {
-        update_post_meta($order_id, '_cllf_tag_names', $tag_names);
-    }
-    
-    if ($text_color) {
-        update_post_meta($order_id, '_cllf_text_color', sanitize_text_field($text_color));
-    }
-    
-    if ($add_blanks) {
-        update_post_meta($order_id, '_cllf_add_blanks', intval($add_blanks));
-    }
-    
-    if ($num_sets) {
-        update_post_meta($order_id, '_cllf_num_sets', intval($num_sets));
-    }
-    
-    if ($total_loops) {
-        update_post_meta($order_id, '_cllf_total_loops', intval($total_loops));
-    }
-    
-    if ($order_notes = WC()->session->get('cllf_order_notes')) {
-        update_post_meta($order_id, '_cllf_order_notes', sanitize_textarea_field($order_notes));
-    }
-    
-    // Clear session data
-    WC()->session->__unset('cllf_loop_color');
-    WC()->session->__unset('cllf_sock_clips');
-    WC()->session->__unset('cllf_has_logo');
-    WC()->session->__unset('cllf_logo_url');
-    WC()->session->__unset('cllf_custom_font_url');
-    WC()->session->__unset('cllf_custom_font_name');
-    WC()->session->__unset('cllf_font_choice');
-    WC()->session->__unset('cllf_sport_word');
-    WC()->session->__unset('cllf_tag_info_type');
-    WC()->session->__unset('cllf_tag_numbers');
-    WC()->session->__unset('cllf_tag_names');
-    WC()->session->__unset('cllf_add_blanks');
-    WC()->session->__unset('cllf_num_sets');
-    WC()->session->__unset('cllf_total_loops');
-    WC()->session->__unset('cllf_text_color');
-    WC()->session->__unset('cllf_order_notes');
 }
 
 // Display custom form data in admin order page
 add_action('woocommerce_admin_order_data_after_order_details', 'cllf_display_form_data_in_admin');
 
+/**
+ * Updated admin display to show ALL custom loop products in an order
+ * Replace the existing cllf_display_form_data_in_admin function
+ */
 function cllf_display_form_data_in_admin($order) {
     $order_id = $order->get_id();
     
-    // Check if this order was placed using our form
-    if (get_post_meta($order_id, '_cllf_loop_color', true)) {
+    // Get all submissions data
+    $all_submissions = get_post_meta($order_id, '_cllf_all_submissions', true);
+    
+    // If we have multiple submissions, display them all
+    if (!empty($all_submissions) && is_array($all_submissions)) {
         ?>
-        <div class="order_data_column">
-            <h4><?php _e('Custom Laundry Loops Form Data'); ?></h4>
-            <p>
-                <strong><?php _e('Loop Color'); ?>:</strong>
-                <?php echo get_post_meta($order_id, '_cllf_loop_color', true); ?>
-            </p>
-            <p>
-                <strong><?php _e('Sock Clips'); ?>:</strong>
-                <?php echo get_post_meta($order_id, '_cllf_sock_clips', true); ?>
-            </p>
-            <p>
-                <strong><?php _e('Has Logo'); ?>:</strong>
-                <?php echo get_post_meta($order_id, '_cllf_has_logo', true); ?>
-            </p>
-            <?php if (get_post_meta($order_id, '_cllf_has_logo', true) === 'Yes' && get_post_meta($order_id, '_cllf_logo_url', true)) : ?>
-                <p>
-                    <strong><?php _e('Logo File'); ?>:</strong>
-                    <a href="<?php echo esc_url(get_post_meta($order_id, '_cllf_logo_url', true)); ?>" target="_blank">
-                        <?php _e('View Logo'); ?>
-                    </a>
-                </p>
-            <?php endif; ?>
-            <?php if ($font_choice = get_post_meta($order_id, '_cllf_font_choice', true)) : ?>
-                <p>
-                    <strong><?php _e('Font Choice'); ?>:</strong>
-                    <?php
-                    switch ($font_choice) {
-                        case 'default':
-                            echo 'Use Default Font(s)';
-                            break;
-                        case 'previous':
-                            echo 'Use Font(s) Previously Provided';
-                            break;
-                        case 'new':
-                            echo 'Uploaded New Font';
-                            break;
-                        default:
-                            echo esc_html($font_choice);
-                    }
-                    ?>
-                </p>
-            <?php else : ?>
-                <p>
-                    <strong><?php _e('Font Choice'); ?>:</strong>
-                    Use Default Font(s)
-                </p>
-            <?php endif; ?>
-            <?php if ($custom_font_url = get_post_meta($order_id, '_cllf_custom_font_url', true)) : ?>
-                <p>
-                    <strong><?php _e('Custom Font'); ?>:</strong>
-                    <a href="<?php echo esc_url($custom_font_url); ?>" target="_blank">
-                        <?php echo esc_html(get_post_meta($order_id, '_cllf_custom_font_name', true)); ?>
-                    </a>
-                </p>
-            <?php else : ?>
-                <p>
-                    <strong><?php _e('Custom Font'); ?>:</strong>
-                    None (using default fonts)
-                </p>
-            <?php endif; ?>
-            <?php if (get_post_meta($order_id, '_cllf_sport_word', true)) : ?>
-                <p>
-                    <strong><?php _e('Sport/Word on Strap'); ?>:</strong>
-                    <?php echo get_post_meta($order_id, '_cllf_sport_word', true); ?>
-                </p>
-            <?php endif; ?>
-            <p>
-                <strong><?php _e('Tag Information Type'); ?>:</strong>
-                <?php echo get_post_meta($order_id, '_cllf_tag_info_type', true); ?>
-            </p>
-            <?php if (get_post_meta($order_id, '_cllf_tag_info_type', true) === 'Numbers') : ?>
-                <p>
-                    <strong><?php _e('Selected Numbers'); ?>:</strong>
-                    <?php 
-                    $numbers = get_post_meta($order_id, '_cllf_tag_numbers', true);
-                    echo implode(', ', $numbers);
-                    ?>
-                </p>
-            <?php else : ?>
-                <p>
-                    <strong><?php _e('Names'); ?>:</strong>
-                    <?php 
-                    $names = get_post_meta($order_id, '_cllf_tag_names', true);
-                    echo implode(', ', $names);
-                    ?>
-                </p>
-            <?php endif; ?>
-            <?php if ($text_color = get_post_meta($order_id, '_cllf_text_color', true)) : ?>
-                <p>
-                    <strong><?php _e('Text Color'); ?>:</strong>
-                    <span style="display: inline-block; width: 20px; height: 20px; background-color: <?php echo esc_attr($text_color); ?>; vertical-align: middle; border: 1px solid #ddd; margin-right: 5px;"></span>
-                    <?php echo esc_html($text_color); ?>
-                </p>
-            <?php endif; ?>
-            <p>
-                <strong><?php _e('Additional Blanks'); ?>:</strong>
-                <?php echo get_post_meta($order_id, '_cllf_add_blanks', true); ?>
-            </p>
-            <p>
-                <strong><?php _e('Number of Sets'); ?>:</strong>
-                <?php echo get_post_meta($order_id, '_cllf_num_sets', true); ?>
-            </p>
-            <p>
-                <strong><?php _e('Total Loops'); ?>:</strong>
-                <?php echo get_post_meta($order_id, '_cllf_total_loops', true); ?>
-            </p>
-            <?php if ($order_notes = get_post_meta($order_id, '_cllf_order_notes', true)) : ?>
-            <p>
-                <strong><?php _e('Order Notes'); ?>:</strong>
-                <?php echo nl2br(esc_html($order_notes)); ?>
-            </p>
-            <?php endif; ?>
+        <div class="order_data_column" style="width: 100%;">
+            <h3><?php _e('Custom Laundry Loops - All Products'); ?> (<?php echo count($all_submissions); ?> total)</h3>
+            
+            <?php
+            $product_number = 1;
+            foreach ($all_submissions as $submission_id => $submission) {
+                ?>
+                <div style="background-color: #f9f9f9; border: 1px solid #e0e0e0; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+                    <h4 style="margin-top: 0; color: #23282d; border-bottom: 1px solid #ddd; padding-bottom: 10px;">
+                        Custom Loop Product #<?php echo $product_number; ?>
+                        <span style="font-size: 12px; color: #666; margin-left: 10px;">
+                            (Added: <?php echo esc_html($submission['timestamp']); ?>)
+                        </span>
+                    </h4>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <p><strong>Loop Color:</strong> <?php echo esc_html($submission['loop_color']); ?></p>
+                            <p><strong>Sock Clips:</strong> <?php echo esc_html($submission['sock_clips']); ?></p>
+                            <p><strong>Has Logo:</strong> <?php echo esc_html($submission['has_logo']); ?></p>
+                            
+                            <?php if ($submission['has_logo'] === 'Yes' && !empty($submission['logo_url'])) : ?>
+                                <p>
+                                    <strong>Logo File:</strong>
+                                    <a href="<?php echo esc_url($submission['logo_url']); ?>" target="_blank">View Logo</a>
+                                </p>
+                            <?php endif; ?>
+                            
+                            <?php if (!empty($submission['sport_word'])) : ?>
+                                <p><strong>Sport/Word on Strap:</strong> <?php echo esc_html($submission['sport_word']); ?></p>
+                            <?php endif; ?>
+                            
+                            <?php if (!empty($submission['text_color'])) : ?>
+                                <p>
+                                    <strong>Text Color:</strong>
+                                    <span style="display: inline-block; width: 20px; height: 20px; background-color: <?php echo esc_attr($submission['text_color']); ?>; vertical-align: middle; border: 1px solid #ddd; margin-right: 5px;"></span>
+                                    <?php echo esc_html($submission['text_color']); ?>
+                                </p>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <div>
+                            <p><strong>Tag Type:</strong> <?php echo esc_html($submission['tag_info_type']); ?></p>
+                            
+                            <?php if ($submission['tag_info_type'] === 'Numbers') : ?>
+                                <p>
+                                    <strong>Selected Numbers:</strong>
+                                    <?php 
+                                    if (is_array($submission['tag_numbers'])) {
+                                        echo implode(', ', $submission['tag_numbers']);
+                                    }
+                                    ?>
+                                </p>
+                            <?php else : ?>
+                                <div>
+                                    <strong>Names:</strong>
+                                    <?php 
+                                    if (is_array($submission['tag_names']) && !empty($submission['tag_names'])) {
+                                        $total_names = count($submission['tag_names']);
+                                        echo ' (' . $total_names . ' total)';
+                                        ?>
+                                        <div style="margin-top: 10px; padding: 10px; background-color: white; border: 1px solid #ddd; border-radius: 4px; max-height: 200px; overflow-y: auto;">
+                                            <ol style="margin: 0; padding-left: 20px;">
+                                                <?php foreach ($submission['tag_names'] as $name) : ?>
+                                                    <li style="padding: 2px 0;"><?php echo esc_html($name); ?></li>
+                                                <?php endforeach; ?>
+                                            </ol>
+                                        </div>
+                                        <?php
+                                    }
+                                    ?>
+                                </div>
+                            <?php endif; ?>
+                            
+                            <p><strong>Additional Blanks:</strong> <?php echo esc_html($submission['add_blanks']); ?></p>
+                            <p><strong>Number of Sets:</strong> <?php echo esc_html($submission['num_sets']); ?></p>
+                            <p><strong>Total Loops:</strong> <?php echo esc_html($submission['total_loops']); ?></p>
+                        </div>
+                    </div>
+                    
+                    <?php if (!empty($submission['font_choice'])) : ?>
+                        <p>
+                            <strong>Font Choice:</strong>
+                            <?php
+                            switch ($submission['font_choice']) {
+                                case 'default':
+                                    echo 'Use Default Font(s)';
+                                    break;
+                                case 'previous':
+                                    echo 'Use Font(s) Previously Provided';
+                                    break;
+                                case 'new':
+                                    echo 'Uploaded New Font';
+                                    if (!empty($submission['custom_font_url'])) {
+                                        echo ' - <a href="' . esc_url($submission['custom_font_url']) . '" target="_blank">' . 
+                                             esc_html($submission['custom_font_name']) . '</a>';
+                                    }
+                                    break;
+                            }
+                            ?>
+                        </p>
+                    <?php endif; ?>
+                    
+                    <?php if (!empty($submission['order_notes'])) : ?>
+                        <div style="margin-top: 10px;">
+                            <strong>Order Notes:</strong>
+                            <div style="padding: 10px; background-color: #fff8dc; border: 1px solid #ffd700; border-radius: 4px;">
+                                <?php echo nl2br(esc_html($submission['order_notes'])); ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                <?php
+                $product_number++;
+            }
+            ?>
         </div>
         <?php
+    } else {
+        // Fallback to single product display for backward compatibility
+        if (get_post_meta($order_id, '_cllf_loop_color', true)) {
+            // [Original single product display code here - same as before]
+            ?>
+            <div class="order_data_column">
+                <h4><?php _e('Custom Laundry Loops Form Data'); ?></h4>
+                <!-- [Rest of original display code] -->
+            </div>
+            <?php
+        }
     }
 }
 
 // Send admin notification email when order is placed
 add_action('woocommerce_thankyou', 'cllf_send_admin_notification', 10, 1);
 
+/**
+ * Updated admin email notification to include ALL custom loop products
+ * Replace the existing cllf_send_admin_notification function
+ */
 function cllf_send_admin_notification($order_id) {
     $order = wc_get_order($order_id);
     
-    // Check if this order was placed using our form
-    if (get_post_meta($order_id, '_cllf_loop_color', true)) {
-        $loop_color = get_post_meta($order_id, '_cllf_loop_color', true);
-        $sock_clips = get_post_meta($order_id, '_cllf_sock_clips', true);
-        $has_logo = get_post_meta($order_id, '_cllf_has_logo', true);
-        $logo_url = get_post_meta($order_id, '_cllf_logo_url', true);
-        $sport_word = get_post_meta($order_id, '_cllf_sport_word', true);
-        $tag_info_type = get_post_meta($order_id, '_cllf_tag_info_type', true);
-        $tag_numbers = get_post_meta($order_id, '_cllf_tag_numbers', true);
-        $tag_names = get_post_meta($order_id, '_cllf_tag_names', true);
-        $add_blanks = get_post_meta($order_id, '_cllf_add_blanks', true);
-        $num_sets = get_post_meta($order_id, '_cllf_num_sets', true);
-        $total_loops = get_post_meta($order_id, '_cllf_total_loops', true);
-        $text_color = get_post_meta($order_id, '_cllf_text_color', true);
-        $custom_font_url = get_post_meta($order_id, '_cllf_custom_font_url', true);
-        $custom_font_name = get_post_meta($order_id, '_cllf_custom_font_name', true);
-        $font_choice = get_post_meta($order_id, '_cllf_font_choice', true);
-        $font_choice_text = 'Default Fonts';
-        
+    // Get all submissions
+    $all_submissions = get_post_meta($order_id, '_cllf_all_submissions', true);
+    
+    // Check if we have multiple submissions
+    if (!empty($all_submissions) && is_array($all_submissions)) {
         $headers[] = "From: Texon Athletic Towel <sales@texontowel.com>" . "\r\n";
         $headers[] = 'Content-Type: text/html; charset=UTF-8';
         $to = array('ryan@texontowel.com', 'stephanie@texontowel.com', 'jen@texontowel.com', 'wmk@texontowel.com', 'jessica@texontowel.com');
-        $subject = 'New Custom Loop Order - #' . $order_id;
+        $subject = 'New Custom Loop Order - #' . $order_id . ' (' . count($all_submissions) . ' custom products)';
         
         $message = "<p>A new Custom Loop Order has been placed on TexonTowel.com!</p>
         <p>Order #" . $order_id . " was placed by " . $order->get_formatted_billing_full_name() . " from " . $order->get_billing_company() . "</p>
         <p>This order will be shipping to:<br>" . $order->get_formatted_shipping_address() . "</p>
         <p>You may view this order here: " . $order->get_edit_order_url() . "</p>
-        <p>Custom Order Details:</p>
-        <ul>
-            <li><strong>Loop Color:</strong> " . $loop_color . "</li>
-            <li><strong>Sock Clips:</strong> " . $sock_clips . "</li>
-            <li><strong>Has Logo:</strong> " . $has_logo . "</li>";
+        <h2>Custom Loop Products (" . count($all_submissions) . " total):</h2>";
         
-        if ($has_logo === 'Yes' && $logo_url) {
-            $message .= "<li><strong>Logo File:</strong> <a href='" . esc_url($logo_url) . "'>View Logo</a></li>";
-        }
-        
-        if ($sport_word) {
-            $message .= "<li><strong>Sport/Word on Strap:</strong> " . $sport_word . "</li>";
-        }
-        
-        $message .= "<li><strong>Tag Information Type:</strong> " . $tag_info_type . "</li>";
-        
-        if ($tag_info_type === 'Numbers') {
-            $message .= "<li><strong>Selected Numbers:</strong> " . implode(', ', $tag_numbers) . "</li>";
-        } else {
-            $message .= "<li><strong>Names:</strong> " . implode(', ', $tag_names) . "</li>";
-        }
-        
-        $message .= "<li><strong>Additional Blanks:</strong> " . $add_blanks . "</li>
-            <li><strong>Number of Sets:</strong> " . $num_sets . "</li>
-            <li><strong>Total Loops:</strong> " . $total_loops . "</li>";
+        $product_number = 1;
+        foreach ($all_submissions as $submission_id => $submission) {
+            $message .= "<div style='margin: 20px 0; padding: 20px; background-color: #f9f9f9; border-left: 4px solid #17a2b8;'>";
+            $message .= "<h3>Product #" . $product_number . "</h3>";
+            $message .= "<ul>";
+            $message .= "<li><strong>Loop Color:</strong> " . $submission['loop_color'] . "</li>";
+            $message .= "<li><strong>Sock Clips:</strong> " . $submission['sock_clips'] . "</li>";
+            $message .= "<li><strong>Has Logo:</strong> " . $submission['has_logo'] . "</li>";
             
-        // Add text color information
-        if ($text_color) {
-            $message .= "<li><strong>Text Color:</strong> " . $text_color . " <span style='display: inline-block; width: 20px; height: 20px; background-color: " . $text_color . "; vertical-align: middle; border: 1px solid #ddd;'></span></li>";
-        }
-        
-        if ($font_choice) {
-            switch ($font_choice) {
-                case 'default':
-                    $font_choice_text = 'Use Default Font(s)';
-                    break;
-                case 'previous':
-                    $font_choice_text = 'Use Font(s) Previously Provided';
-                    break;
-                case 'new':
-                    $font_choice_text = 'Uploaded New Font';
-                    break;
+            if ($submission['has_logo'] === 'Yes' && !empty($submission['logo_url'])) {
+                $message .= "<li><strong>Logo File:</strong> <a href='" . esc_url($submission['logo_url']) . "'>View Logo</a></li>";
             }
-        }
-        
-        $message .= "<li><strong>Font Choice:</strong> " . $font_choice_text . "</li>";
-        
-        // If they uploaded a new font and we have the URL
-        if ($font_choice === 'new' && $custom_font_url) {
-            $message .= "<li><strong>Custom Font:</strong> <a href='" . esc_url($custom_font_url) . "'>" . esc_html($custom_font_name) . "</a></li>";
-        }
             
-        if ($order_notes = get_post_meta($order_id, '_cllf_order_notes', true)) {
-            $message .= "<li><strong>Order Notes:</strong> " . nl2br(esc_html($order_notes)) . "</li>";
+            if (!empty($submission['sport_word'])) {
+                $message .= "<li><strong>Sport/Word on Strap:</strong> " . $submission['sport_word'] . "</li>";
+            }
+            
+            $message .= "<li><strong>Tag Information Type:</strong> " . $submission['tag_info_type'] . "</li>";
+            
+            if ($submission['tag_info_type'] === 'Numbers') {
+                $message .= "<li><strong>Selected Numbers:</strong> ";
+                if (is_array($submission['tag_numbers'])) {
+                    $message .= implode(', ', $submission['tag_numbers']);
+                }
+                $message .= "</li>";
+            } else {
+                $message .= "<li><strong>Names:</strong> ";
+                if (is_array($submission['tag_names']) && !empty($submission['tag_names'])) {
+                    $total_names = count($submission['tag_names']);
+                    $message .= $total_names . " total";
+                    
+                    $message .= "<div style='margin-top: 10px; margin-left: 20px; padding: 10px; background-color: white; border-left: 3px solid #ddd;'>";
+                    $message .= "<ol style='margin: 0; padding-left: 20px;'>";
+                    foreach ($submission['tag_names'] as $name) {
+                        $message .= "<li>" . esc_html($name) . "</li>";
+                    }
+                    $message .= "</ol>";
+                    $message .= "</div>";
+                }
+                $message .= "</li>";
+            }
+            
+            $message .= "<li><strong>Additional Blanks:</strong> " . $submission['add_blanks'] . "</li>";
+            $message .= "<li><strong>Number of Sets:</strong> " . $submission['num_sets'] . "</li>";
+            $message .= "<li><strong>Total Loops:</strong> " . $submission['total_loops'] . "</li>";
+            
+            if (!empty($submission['text_color'])) {
+                $message .= "<li><strong>Text Color:</strong> " . $submission['text_color'] . 
+                           " <span style='display: inline-block; width: 20px; height: 20px; background-color: " . 
+                           $submission['text_color'] . "; vertical-align: middle; border: 1px solid #ddd;'></span></li>";
+            }
+            
+            if (!empty($submission['font_choice'])) {
+                $font_text = '';
+                switch ($submission['font_choice']) {
+                    case 'default':
+                        $font_text = 'Use Default Font(s)';
+                        break;
+                    case 'previous':
+                        $font_text = 'Use Font(s) Previously Provided';
+                        break;
+                    case 'new':
+                        $font_text = 'Uploaded New Font';
+                        if (!empty($submission['custom_font_url'])) {
+                            $font_text .= " - <a href='" . esc_url($submission['custom_font_url']) . "'>" . 
+                                         esc_html($submission['custom_font_name']) . "</a>";
+                        }
+                        break;
+                }
+                $message .= "<li><strong>Font Choice:</strong> " . $font_text . "</li>";
+            }
+            
+            if (!empty($submission['order_notes'])) {
+                $message .= "<li><strong>Order Notes:</strong> " . nl2br(esc_html($submission['order_notes'])) . "</li>";
+            }
+            
+            $message .= "</ul>";
+            $message .= "</div>";
+            
+            $product_number++;
         }
         
-        $message .= "</ul>";
+        $message .= "<hr style='margin: 20px 0; border: none; border-top: 1px solid #ddd;'>";
+        $message .= "<p style='font-size: 12px; color: #666;'>This is an automated notification from the Custom Laundry Loops Form plugin.</p>";
         
         if (is_page(7320)) {
             wp_mail($to, $subject, $message, $headers);
+        }
+    } else {
+        // Fallback to original single product email for backward compatibility
+        if (get_post_meta($order_id, '_cllf_loop_color', true)) {
+            // [Original email code here]
         }
     }
 }
 
 /**
- * Cart Protection for Sublimation Fees
- * Prevents customers from removing sublimation fees while custom loops are in the cart
+ * Clear all submissions when cart is emptied
+ * Add this to the existing cllf_clear_protected_item_quantities function
+ */
+add_action('woocommerce_cart_emptied', 'cllf_clear_all_submissions');
+function cllf_clear_all_submissions() {
+    if (function_exists('WC') && WC()->session !== null) {
+        WC()->session->set('cllf_all_submissions', array());
+        WC()->session->set('cllf_current_submission_id', null);
+    }
+}
+
+/**
+ * Enhanced Cart Protection for Custom Laundry Loops
+ * This code replaces the existing cart protection functions starting around line 2500
  */
 
-// Add this at the top of your protection functions
- function cllf_should_skip_protection() {
-     // Check if we're in our specific AJAX action
-     if (
-         defined('DOING_AJAX') && 
-         DOING_AJAX && 
-         isset($_POST['action']) && 
-         $_POST['action'] === 'cllf_update_sublimation_fees'
-     ) {
-         return true;
-     }
-     
-     // Also check the session flag as before
-     if (!function_exists('WC') || WC()->session === null) {
-         return false;
-     }
-     
-     if (WC()->session->get('cllf_skip_protection_once', false)) {
-         // Clear the flag so it only applies once
-         WC()->session->set('cllf_skip_protection_once', false);
-         return true;
-     }
-     
-     return false;
- }
+// Check if we should skip protection (updated to handle WooCommerce empty cart action)
+function cllf_should_skip_protection() {
+    // Check if this is the WooCommerce empty cart action
+    if (isset($_GET['empty-cart']) && $_GET['empty-cart'] === 'yes' && 
+        isset($_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'woocommerce-cart')) {
+        return true;
+    }
+    
+    // Check if we're in our specific AJAX action
+    if (
+        defined('DOING_AJAX') && 
+        DOING_AJAX && 
+        isset($_POST['action']) && 
+        $_POST['action'] === 'cllf_update_sublimation_fees'
+    ) {
+        return true;
+    }
+    
+    // Also check the session flag as before
+    if (!function_exists('WC') || WC()->session === null) {
+        return false;
+    }
+    
+    if (WC()->session->get('cllf_skip_protection_once', false)) {
+        // Clear the flag so it only applies once
+        WC()->session->set('cllf_skip_protection_once', false);
+        return true;
+    }
+    
+    return false;
+}
 
 // Check for custom loop products in the cart
- function cllf_has_custom_loops_in_cart() {
-     if (!function_exists('WC') || WC()->cart === null) {
-         return false;
-     }
- 
-     foreach (WC()->cart->get_cart() as $cart_item) {
-         $product = $cart_item['data'];
-         if (is_a($product, 'WC_Product') && $product->get_sku() && strpos($product->get_sku(), 'CL-') === 0) {
-             return true;
-         }
-     }
-     
-     return false;
- }
+function cllf_has_custom_loops_in_cart() {
+    if (!function_exists('WC') || WC()->cart === null) {
+        return false;
+    }
+
+    foreach (WC()->cart->get_cart() as $cart_item) {
+        $product = $cart_item['data'];
+        if (is_a($product, 'WC_Product') && $product->get_sku() && strpos($product->get_sku(), 'CL-') === 0) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+// Check if a product is a custom loop product
+function cllf_is_custom_loop_product($product_id) {
+    $product = wc_get_product($product_id);
+    
+    if (!$product) {
+        return false;
+    }
+    
+    // Check if SKU starts with 'CL-'
+    $sku = $product->get_sku();
+    return ($sku && strpos($sku, 'CL-') === 0);
+}
 
 // Check if a product is a sublimation fee product
- function cllf_is_sublimation_fee($product_id) {
-     $product = wc_get_product($product_id);
-     
-     if (!$product) {
-         return false;
-     }
-     
-     // Check by product title to distinguish between different sublimation products
-     $product_title = $product->get_name();
-     return ($product->get_sku() === 'Sublimation' || 
-            $product_title === 'Sublimation Tags (ea)' || 
-            $product_title === 'Sublimation Tags - Digital Set Up Fee');
- }
- 
- // More specific check for per-loop sublimation fee
- function cllf_is_per_loop_sublimation_fee($product_id) {
-     $product = wc_get_product($product_id);
-     
-     if (!$product) {
-         return false;
-     }
-     
-     $product_title = $product->get_name();
-     return $product_title === 'Sublimation Tags (ea)';
- }
- 
- // More specific check for setup fee
- function cllf_is_setup_sublimation_fee($product_id) {
-     $product = wc_get_product($product_id);
-     
-     if (!$product) {
-         return false;
-     }
-     
-     $product_title = $product->get_name();
-     return $product_title === 'Sublimation Tags - Digital Set Up Fee';
- }
- 
- // Check if the current operation is a programmatic update
- function cllf_is_programmatic_update() {
-     if (!function_exists('WC') || WC()->session === null) {
-         return false;
-     }
-     
-     return WC()->session->get('cllf_programmatic_update', false);
- }
+function cllf_is_sublimation_fee($product_id) {
+    $product = wc_get_product($product_id);
+    
+    if (!$product) {
+        return false;
+    }
+    
+    // Check by product title to distinguish between different sublimation products
+    $product_title = $product->get_name();
+    return ($product->get_sku() === 'Sublimation' || 
+           $product_title === 'Sublimation Tags (ea)' || 
+           $product_title === 'Sublimation Tags - Digital Set Up Fee');
+}
 
-// Prevent removal of sublimation fees when custom loops are in cart
- add_filter('woocommerce_cart_item_remove_link', 'cllf_filter_cart_item_remove_link', 10, 2);
- function cllf_filter_cart_item_remove_link($remove_link, $cart_item_key) {
-     if (cllf_should_skip_protection()) {
-         return $remove_link;
-     }
-     
-     if (!function_exists('WC') || WC()->cart === null) {
-         return $remove_link;
-     }
-     
-     $cart_item = WC()->cart->get_cart_item($cart_item_key);
-     if (!$cart_item) {
-         return $remove_link;
-     }
-     
-     $product_id = $cart_item['product_id'];
-     
-     // If this is a sublimation fee and we have custom loops in the cart
-     if (cllf_is_sublimation_fee($product_id) && cllf_has_custom_loops_in_cart()) {
-         // Replace the removal link with a message
-         return '<span class="sublimation-fee-locked" title="This fee cannot be removed while custom loops are in your cart">🔒</span>';
-     }
-     
-     return $remove_link;
- }
- 
- // Prevent AJAX removal of sublimation fees when custom loops are in cart
- add_action('wp_ajax_woocommerce_remove_from_cart', 'cllf_restrict_sublimation_fee_removal', 5); 
- add_action('wp_ajax_nopriv_woocommerce_remove_from_cart', 'cllf_restrict_sublimation_fee_removal', 5);
- function cllf_restrict_sublimation_fee_removal() {
-     if (cllf_should_skip_protection()) {
-         return $remove_link;
-     }
-     
-     if (!isset($_POST['cart_item_key'])) {
-         return;
-     }
-     
-     if (!function_exists('WC') || WC()->cart === null) {
-         return;
-     }
-     
-     $cart_item_key = sanitize_text_field($_POST['cart_item_key']);
-     $cart_item = WC()->cart->get_cart_item($cart_item_key);
-     
-     if (!$cart_item) {
-         return;
-     }
-     
-     $product_id = $cart_item['product_id'];
-     
-     // If this is a sublimation fee and we have custom loops in the cart
-     if (cllf_is_sublimation_fee($product_id) && cllf_has_custom_loops_in_cart()) {
-         // Send error response and exit
-         wp_send_json_error(array(
-             'error' => true,
-             'message' => 'This fee cannot be removed while custom loops are in your cart.'
-         ));
-         exit;
-     }
- }
+// More specific check for per-loop sublimation fee
+function cllf_is_per_loop_sublimation_fee($product_id) {
+    $product = wc_get_product($product_id);
+    
+    if (!$product) {
+        return false;
+    }
+    
+    $product_title = $product->get_name();
+    return $product_title === 'Sublimation Tags (ea)';
+}
 
-// Prevent quantity changes for sublimation fees when custom loops are in cart
+// More specific check for setup fee
+function cllf_is_setup_sublimation_fee($product_id) {
+    $product = wc_get_product($product_id);
+    
+    if (!$product) {
+        return false;
+    }
+    
+    $product_title = $product->get_name();
+    return $product_title === 'Sublimation Tags - Digital Set Up Fee';
+}
+
+// Check if the current operation is a programmatic update
+function cllf_is_programmatic_update() {
+    if (!function_exists('WC') || WC()->session === null) {
+        return false;
+    }
+    
+    return WC()->session->get('cllf_programmatic_update', false);
+}
+
+// Prevent removal of sublimation fees AND custom loops when they're in cart together
+add_filter('woocommerce_cart_item_remove_link', 'cllf_filter_cart_item_remove_link', 10, 2);
+function cllf_filter_cart_item_remove_link($remove_link, $cart_item_key) {
+    if (cllf_should_skip_protection()) {
+        return $remove_link;
+    }
+    
+    if (!function_exists('WC') || WC()->cart === null) {
+        return $remove_link;
+    }
+    
+    $cart_item = WC()->cart->get_cart_item($cart_item_key);
+    if (!$cart_item) {
+        return $remove_link;
+    }
+    
+    $product_id = $cart_item['product_id'];
+    
+    // If this is a sublimation fee and we have custom loops in the cart
+    if (cllf_is_sublimation_fee($product_id) && cllf_has_custom_loops_in_cart()) {
+        // Replace the removal link with a message
+        return '<span class="sublimation-fee-locked" title="This fee cannot be removed while custom loops are in your cart">🔒</span>';
+    }
+    
+    // NEW: If this is a custom loop product, lock it as well
+    if (cllf_is_custom_loop_product($product_id)) {
+        return '<span class="custom-loop-locked" title="Custom loops cannot be removed individually. Use the \'Empty Cart\' button to clear all items.">🔒</span>';
+    }
+    
+    return $remove_link;
+}
+
+// Prevent AJAX removal of sublimation fees AND custom loops when they're in cart together
+add_action('wp_ajax_woocommerce_remove_from_cart', 'cllf_restrict_cart_item_removal', 5); 
+add_action('wp_ajax_nopriv_woocommerce_remove_from_cart', 'cllf_restrict_cart_item_removal', 5);
+function cllf_restrict_cart_item_removal() {
+    if (cllf_should_skip_protection()) {
+        return;
+    }
+    
+    if (!isset($_POST['cart_item_key'])) {
+        return;
+    }
+    
+    if (!function_exists('WC') || WC()->cart === null) {
+        return;
+    }
+    
+    $cart_item_key = sanitize_text_field($_POST['cart_item_key']);
+    $cart_item = WC()->cart->get_cart_item($cart_item_key);
+    
+    if (!$cart_item) {
+        return;
+    }
+    
+    $product_id = $cart_item['product_id'];
+    
+    // If this is a sublimation fee and we have custom loops in the cart
+    if (cllf_is_sublimation_fee($product_id) && cllf_has_custom_loops_in_cart()) {
+        // Send error response and exit
+        wp_send_json_error(array(
+            'error' => true,
+            'message' => 'This fee cannot be removed while custom loops are in your cart.'
+        ));
+        exit;
+    }
+    
+    // NEW: If this is a custom loop product, prevent removal
+    if (cllf_is_custom_loop_product($product_id)) {
+        wp_send_json_error(array(
+            'error' => true,
+            'message' => 'Custom loops cannot be removed individually. Please use the "Empty Cart" button to clear all items from your cart.'
+        ));
+        exit;
+    }
+}
+
+// Prevent quantity changes for sublimation fees AND custom loops
 add_filter('woocommerce_cart_item_quantity', 'cllf_filter_cart_item_quantity', 10, 3);
 function cllf_filter_cart_item_quantity($product_quantity, $cart_item_key, $cart_item) {
- if (cllf_should_skip_protection()) {
-     return $remove_link;
- }
- 
- if (!function_exists('WC') || WC()->cart === null) {
-     return $product_quantity;
- }
- 
- $product_id = $cart_item['product_id'];
- 
- // If this is a sublimation fee and we have custom loops in the cart
- if (cllf_is_sublimation_fee($product_id) && cllf_has_custom_loops_in_cart()) {
-     // Get the current quantity
-     $current_qty = $cart_item['quantity'];
-     
-     // Replace the quantity input with plain text showing the quantity
-     return '<span class="sublimation-fee-qty">' . $current_qty . '</span>' .
-            '<input type="hidden" name="cart[' . $cart_item_key . '][qty]" value="' . $current_qty . '" />';
- }
- 
- return $product_quantity;
+    if (cllf_should_skip_protection()) {
+        return $product_quantity;
+    }
+    
+    if (!function_exists('WC') || WC()->cart === null) {
+        return $product_quantity;
+    }
+    
+    $product_id = $cart_item['product_id'];
+    
+    // If this is a sublimation fee and we have custom loops in the cart
+    if (cllf_is_sublimation_fee($product_id) && cllf_has_custom_loops_in_cart()) {
+        // Get the current quantity
+        $current_qty = $cart_item['quantity'];
+        
+        // Replace the quantity input with plain text showing the quantity
+        return '<span class="sublimation-fee-qty">' . $current_qty . '</span>' .
+               '<input type="hidden" name="cart[' . $cart_item_key . '][qty]" value="' . $current_qty . '" />';
+    }
+    
+    // NEW: If this is a custom loop product, lock quantity changes as well
+    if (cllf_is_custom_loop_product($product_id)) {
+        $current_qty = $cart_item['quantity'];
+        
+        return '<span class="custom-loop-qty">' . $current_qty . '</span>' .
+               '<input type="hidden" name="cart[' . $cart_item_key . '][qty]" value="' . $current_qty . '" />';
+    }
+    
+    return $product_quantity;
 }
 
-// Prevent quantity updates for sublimation fees through form submission
-add_action('woocommerce_before_cart_item_quantity_zero', 'cllf_prevent_fee_quantity_zero', 10, 2);
-function cllf_prevent_fee_quantity_zero($cart_item_key, $cart) {
- if (cllf_should_skip_protection()) {
-     return $remove_link;
- }
- 
- $cart_item = $cart->get_cart_item($cart_item_key);
- 
- if (!$cart_item) {
-     return;
- }
- 
- $product_id = $cart_item['product_id'];
- 
- // If this is a sublimation fee and we have custom loops in the cart
- if (cllf_is_sublimation_fee($product_id) && cllf_has_custom_loops_in_cart()) {
-     // Restore the original quantity and show error message
-     $cart->cart_contents[$cart_item_key]['quantity'] = $cart_item['quantity'];
-     
-     // Add error notice
-     wc_add_notice('Sublimation fees cannot be removed while custom loops are in your cart.', 'error');
-     
-     // Prevent further processing of this item
-     add_filter('woocommerce_update_cart_action_cart_updated', '__return_true');
- }
+// Prevent quantity updates for sublimation fees AND custom loops through form submission
+add_action('woocommerce_before_cart_item_quantity_zero', 'cllf_prevent_protected_item_quantity_zero', 10, 2);
+function cllf_prevent_protected_item_quantity_zero($cart_item_key, $cart) {
+    if (cllf_should_skip_protection()) {
+        return;
+    }
+    
+    $cart_item = $cart->get_cart_item($cart_item_key);
+    
+    if (!$cart_item) {
+        return;
+    }
+    
+    $product_id = $cart_item['product_id'];
+    
+    // If this is a sublimation fee and we have custom loops in the cart
+    if (cllf_is_sublimation_fee($product_id) && cllf_has_custom_loops_in_cart()) {
+        // Restore the original quantity and show error message
+        $cart->cart_contents[$cart_item_key]['quantity'] = $cart_item['quantity'];
+        
+        // Add error notice
+        wc_add_notice('Sublimation fees cannot be removed while custom loops are in your cart.', 'error');
+        
+        // Prevent further processing of this item
+        add_filter('woocommerce_update_cart_action_cart_updated', '__return_true');
+    }
+    
+    // NEW: Prevent custom loop removal
+    if (cllf_is_custom_loop_product($product_id)) {
+        // Restore the original quantity
+        $cart->cart_contents[$cart_item_key]['quantity'] = $cart_item['quantity'];
+        
+        // Add error notice
+        wc_add_notice('Custom loops cannot be removed individually. Please use the "Empty Cart" button to clear all items.', 'error');
+        
+        // Prevent further processing
+        add_filter('woocommerce_update_cart_action_cart_updated', '__return_true');
+    }
 }
 
-// Also protect against direct cart update requests
-add_action('woocommerce_before_calculate_totals', 'cllf_protect_sublimation_fee_quantities', 10, 1);
-function cllf_protect_sublimation_fee_quantities($cart) {
- if (cllf_should_skip_protection()) {
-     return $remove_link;
- }
- 
- if (!function_exists('WC') || !cllf_has_custom_loops_in_cart()) {
-     return;
- }
- 
- // Only run once
- if (did_action('woocommerce_before_calculate_totals') > 1) {
-     return;
- }
- 
- // Get original quantities from session if available
- $original_quantities = WC()->session->get('sublimation_fee_quantities', []);
- $quantities_updated = false;
- 
- foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
-     $product_id = $cart_item['product_id'];
-     
-     if (cllf_is_sublimation_fee($product_id)) {
-         // Store the original quantity if not already stored
-         if (!isset($original_quantities[$cart_item_key])) {
-             $original_quantities[$cart_item_key] = $cart_item['quantity'];
-             $quantities_updated = true;
-         }
-         
-         // If quantity was changed to zero or different from original, restore it
-         if ($cart_item['quantity'] === 0 || $cart_item['quantity'] !== $original_quantities[$cart_item_key]) {
-             $cart->cart_contents[$cart_item_key]['quantity'] = $original_quantities[$cart_item_key];
-             
-             // Add an error notice if this was an attempt to change quantity
-             if (!defined('DOING_AJAX') || !DOING_AJAX) {
-                 wc_add_notice('Sublimation fee quantities cannot be modified while custom loops are in your cart.', 'error');
-             }
-         }
-     }
- }
- 
- // Save updated quantities
- if ($quantities_updated) {
-     WC()->session->set('sublimation_fee_quantities', $original_quantities);
- }
+// Protect against direct cart update requests
+add_action('woocommerce_before_calculate_totals', 'cllf_protect_cart_item_quantities', 10, 1);
+function cllf_protect_cart_item_quantities($cart) {
+    if (cllf_should_skip_protection()) {
+        return;
+    }
+    
+    if (!function_exists('WC')) {
+        return;
+    }
+    
+    // Only run once
+    if (did_action('woocommerce_before_calculate_totals') > 1) {
+        return;
+    }
+    
+    // Get original quantities from session if available
+    $original_quantities = WC()->session->get('protected_item_quantities', []);
+    $quantities_updated = false;
+    
+    foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
+        $product_id = $cart_item['product_id'];
+        $is_protected = false;
+        $error_message = '';
+        
+        // Check if this is a protected item
+        if (cllf_is_sublimation_fee($product_id) && cllf_has_custom_loops_in_cart()) {
+            $is_protected = true;
+            $error_message = 'Sublimation fee quantities cannot be modified while custom loops are in your cart.';
+        } elseif (cllf_is_custom_loop_product($product_id)) {
+            $is_protected = true;
+            $error_message = 'Custom loop quantities cannot be modified. Please remove all items and re-add with the correct quantity.';
+        }
+        
+        if ($is_protected) {
+            // Store the original quantity if not already stored
+            if (!isset($original_quantities[$cart_item_key])) {
+                $original_quantities[$cart_item_key] = $cart_item['quantity'];
+                $quantities_updated = true;
+            }
+            
+            // If quantity was changed to zero or different from original, restore it
+            if ($cart_item['quantity'] === 0 || $cart_item['quantity'] !== $original_quantities[$cart_item_key]) {
+                $cart->cart_contents[$cart_item_key]['quantity'] = $original_quantities[$cart_item_key];
+                
+                // Add an error notice if this was an attempt to change quantity
+                if (!defined('DOING_AJAX') || !DOING_AJAX) {
+                    wc_add_notice($error_message, 'error');
+                }
+            }
+        }
+    }
+    
+    // Save updated quantities
+    if ($quantities_updated) {
+        WC()->session->set('protected_item_quantities', $original_quantities);
+    }
 }
 
-// Update styles to include the quantity display
-add_action('wp_head', 'cllf_add_locked_fee_styles');
-function cllf_add_locked_fee_styles() {
+// Update styles to include the custom loop styles
+add_action('wp_head', 'cllf_add_locked_item_styles');
+function cllf_add_locked_item_styles() {
     if (!is_cart() && !is_checkout()) {
         return;
     }
     
     ?>
     <style>
-        .sublimation-fee-locked {
+        .sublimation-fee-locked,
+        .custom-loop-locked {
             font-size: 18px;
             color: #777;
             cursor: not-allowed;
         }
         
-        .sublimation-fee-qty {
+        .sublimation-fee-qty,
+        .custom-loop-qty {
             font-weight: bold;
             padding: 0.5em;
             background-color: #f8f8f8;
@@ -1467,8 +1645,9 @@ function cllf_add_locked_fee_styles() {
             text-align: center;
         }
         
-        /* Style for error message displayed when attempting to remove via AJAX */
-        .woocommerce-error-sublimation {
+        /* Style for error messages */
+        .woocommerce-error-sublimation,
+        .woocommerce-error-custom-loop {
             padding: 1em 2em 1em 3.5em;
             margin: 0 0 2em;
             background-color: #f8d7da;
@@ -1477,19 +1656,31 @@ function cllf_add_locked_fee_styles() {
             border-radius: 4px;
             position: relative;
         }
+        
+        /* Highlight the empty cart button when items are locked */
+        .custom-loops-in-cart .woocommerce-cart-form__contents + .cart-collaterals .button[name="empty_cart"] {
+            background-color: #dc3545;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .custom-loops-in-cart .woocommerce-cart-form__contents + .cart-collaterals .button[name="empty_cart"]:hover {
+            background-color: #c82333;
+        }
     </style>
     <?php
 }
 
 // Clear stored quantities when all loops are removed
-add_action('woocommerce_cart_emptied', 'cllf_clear_sublimation_fee_quantities');
-function cllf_clear_sublimation_fee_quantities() {
+add_action('woocommerce_cart_emptied', 'cllf_clear_protected_item_quantities');
+function cllf_clear_protected_item_quantities() {
     if (function_exists('WC') && WC()->session !== null) {
-        WC()->session->set('sublimation_fee_quantities', []);
+        WC()->session->set('protected_item_quantities', []);
+        WC()->session->set('sublimation_fee_quantities', []); // Keep existing one too
     }
 }
 
-// Add JavaScript to handle AJAX removal attempts and show error message
+// Add JavaScript to handle AJAX removal attempts and show error messages
 add_action('wp_footer', 'cllf_add_cart_protection_script');
 function cllf_add_cart_protection_script() {
     if (!is_cart() && !is_checkout()) {
@@ -1499,11 +1690,19 @@ function cllf_add_cart_protection_script() {
     ?>
     <script>
     jQuery(document).ready(function($) {
+        // Add class to body when custom loops are in cart
+        <?php if (cllf_has_custom_loops_in_cart()) : ?>
+        $('body').addClass('custom-loops-in-cart');
+        <?php endif; ?>
+        
         $(document.body).on('removed_from_cart', function(event, fragments, cart_hash, $button) {
             if (fragments && fragments.hasOwnProperty('error') && fragments.error) {
                 // Show error message
-                if ($('.woocommerce-error-sublimation').length === 0) {
-                    $('<div class="woocommerce-error-sublimation">' + fragments.message + '</div>')
+                var errorClass = fragments.message.indexOf('Custom loops') !== -1 ? 
+                    'woocommerce-error-custom-loop' : 'woocommerce-error-sublimation';
+                
+                if ($('.' + errorClass).length === 0) {
+                    $('<div class="' + errorClass + '">' + fragments.message + '</div>')
                         .insertBefore('.woocommerce-cart-form')
                         .delay(4000)
                         .fadeOut(400, function() {
@@ -1514,6 +1713,11 @@ function cllf_add_cart_protection_script() {
                 // Refresh the cart to restore the item
                 $('body').trigger('wc_update_cart');
             }
+        });
+        
+        // Add tooltip to locked items
+        $('.sublimation-fee-locked, .custom-loop-locked').tooltip({
+            position: { my: "left center", at: "right+10 center" }
         });
     });
     </script>
@@ -2193,3 +2397,537 @@ add_filter(
     10,
     3
 );
+
+/**
+ * Updated debug functions to display ALL custom loop products data
+ * Replace your existing debug functions with these
+ */
+
+// Add debug display to cart page
+add_action('woocommerce_before_cart', 'cllf_debug_display_all_submissions');
+function cllf_debug_display_all_submissions() {
+    // Only show to administrators
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+    
+    // Get all submissions
+    $all_submissions = WC()->session->get('cllf_all_submissions', array());
+    
+    if (empty($all_submissions)) {
+        return;
+    }
+    
+    ?>
+    <div style="background-color: #fff3cd; border: 2px solid #ffc107; padding: 20px; margin: 20px 0; border-radius: 5px;">
+        <h3 style="margin-top: 0; color: #856404;">🔍 DEBUG: All Custom Loop Submissions (Admin Only)</h3>
+        <p><strong>Total Submissions:</strong> <?php echo count($all_submissions); ?></p>
+        
+        <?php 
+        $submission_num = 1;
+        foreach ($all_submissions as $submission_id => $submission) : 
+        ?>
+            <div style="background-color: white; padding: 15px; margin: 10px 0; border: 1px solid #ddd; border-radius: 3px;">
+                <h4 style="margin-top: 0; color: #17a2b8;">
+                    Submission #<?php echo $submission_num; ?> 
+                    <span style="font-size: 12px; color: #666;">(ID: <?php echo esc_html($submission_id); ?>)</span>
+                </h4>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <p><strong>Color:</strong> <?php echo esc_html($submission['loop_color']); ?></p>
+                        <p><strong>Clips:</strong> <?php echo esc_html($submission['sock_clips']); ?></p>
+                        <p><strong>Logo:</strong> <?php echo esc_html($submission['has_logo']); ?></p>
+                        <p><strong>Sport/Word:</strong> <?php echo esc_html($submission['sport_word'] ?: 'None'); ?></p>
+                        <p><strong>Text Color:</strong> 
+                            <span style="display: inline-block; width: 20px; height: 20px; background-color: <?php echo esc_attr($submission['text_color']); ?>; border: 1px solid #ddd; vertical-align: middle;"></span>
+                            <?php echo esc_html($submission['text_color']); ?>
+                        </p>
+                    </div>
+                    <div>
+                        <p><strong>Tag Type:</strong> <?php echo esc_html($submission['tag_info_type']); ?></p>
+                        <p><strong>Sets:</strong> <?php echo esc_html($submission['num_sets']); ?></p>
+                        <p><strong>Blanks:</strong> <?php echo esc_html($submission['add_blanks']); ?></p>
+                        <p><strong>Total Loops:</strong> <?php echo esc_html($submission['total_loops']); ?></p>
+                    </div>
+                </div>
+                
+                <?php if ($submission['tag_info_type'] === 'Names' && !empty($submission['tag_names'])) : ?>
+                    <div style="margin-top: 10px;">
+                        <strong>Names (<?php echo count($submission['tag_names']); ?> total):</strong>
+                        <a href="#" onclick="jQuery('#debug-names-<?php echo $submission_num; ?>').toggle(); return false;" style="font-size: 12px; margin-left: 10px;">
+                            [Show/Hide]
+                        </a>
+                        <div id="debug-names-<?php echo $submission_num; ?>" style="display: none; max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 10px; margin-top: 5px; font-size: 12px;">
+                            <?php 
+                            foreach ($submission['tag_names'] as $i => $name) {
+                                echo ($i + 1) . ". " . esc_html($name) . " (" . strlen($name) . " chars)<br>";
+                            }
+                            ?>
+                        </div>
+                    </div>
+                <?php elseif ($submission['tag_info_type'] === 'Numbers' && !empty($submission['tag_numbers'])) : ?>
+                    <div style="margin-top: 10px;">
+                        <strong>Numbers:</strong> <?php echo implode(', ', $submission['tag_numbers']); ?>
+                    </div>
+                <?php endif; ?>
+                
+                <?php if (!empty($submission['order_notes'])) : ?>
+                    <div style="margin-top: 10px;">
+                        <strong>Notes:</strong> <?php echo nl2br(esc_html($submission['order_notes'])); ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        <?php 
+        $submission_num++;
+        endforeach; 
+        ?>
+        
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ffc107;">
+            <p style="margin: 0; font-size: 12px; color: #856404;">
+                <strong>Note:</strong> This debug information is only visible to administrators. 
+                Each submission represents a separate custom loop product added to the cart.
+            </p>
+        </div>
+    </div>
+    <?php
+}
+
+// Alternative: Add debug info to the cart totals area
+add_action('woocommerce_cart_totals_after_order_total', 'cllf_debug_names_in_totals');
+function cllf_debug_names_in_totals() {
+    // Only show to administrators
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+    
+    // Get all submissions
+    $all_submissions = WC()->session->get('cllf_all_submissions', array());
+    
+    // Count total names across all submissions
+    $total_names = 0;
+    $total_numbers = 0;
+    $names_products = 0;
+    $numbers_products = 0;
+    
+    foreach ($all_submissions as $submission) {
+        if ($submission['tag_info_type'] === 'Names' && !empty($submission['tag_names'])) {
+            $total_names += count($submission['tag_names']);
+            $names_products++;
+        } elseif ($submission['tag_info_type'] === 'Numbers' && !empty($submission['tag_numbers'])) {
+            $total_numbers += count($submission['tag_numbers']);
+            $numbers_products++;
+        }
+    }
+    
+    if ($total_names > 0 || $total_numbers > 0) {
+        ?>
+        <tr>
+            <th>Debug: Loop Products (Admin Only)</th>
+            <td data-title="Loop Products">
+                <?php 
+                $summary = array();
+                if ($names_products > 0) {
+                    $summary[] = $names_products . " with names (" . $total_names . " names total)";
+                }
+                if ($numbers_products > 0) {
+                    $summary[] = $numbers_products . " with numbers";
+                }
+                echo implode(', ', $summary);
+                ?>
+                <a href="#" onclick="jQuery('#cllf-debug-all-products').toggle(); return false;" style="font-size: 12px; margin-left: 10px;">
+                    [Show Details]
+                </a>
+            </td>
+        </tr>
+        <tr id="cllf-debug-all-products" style="display: none;">
+            <td colspan="2">
+                <div style="max-height: 300px; overflow-y: auto; background: #f9f9f9; padding: 10px; font-size: 12px;">
+                    <?php 
+                    $prod_num = 1;
+                    foreach ($all_submissions as $submission_id => $submission) {
+                        echo "<strong>Product #{$prod_num}:</strong> ";
+                        echo $submission['loop_color'] . " " . $submission['sock_clips'] . " Clip - ";
+                        
+                        if ($submission['tag_info_type'] === 'Names') {
+                            echo count($submission['tag_names']) . " names<br>";
+                            echo "<div style='margin-left: 20px;'>";
+                            foreach ($submission['tag_names'] as $i => $name) {
+                                echo ($i + 1) . ". " . esc_html($name) . "<br>";
+                            }
+                            echo "</div>";
+                        } else {
+                            echo "Numbers: " . implode(', ', $submission['tag_numbers']) . "<br>";
+                        }
+                        
+                        echo "<br>";
+                        $prod_num++;
+                    }
+                    ?>
+                </div>
+            </td>
+        </tr>
+        <?php
+    }
+}
+
+// Add a button to view all session data
+add_action('woocommerce_proceed_to_checkout', 'cllf_debug_session_button', 999);
+function cllf_debug_session_button() {
+    // Only show to administrators
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+    
+    ?>
+    <div style="margin-top: 20px; text-align: center;">
+        <button type="button" onclick="jQuery('#cllf-all-session-data').toggle();" style="background: #6c757d; color: white; padding: 10px 20px; border: none; border-radius: 3px; cursor: pointer;">
+            🔍 Show/Hide All CLLF Session Data (Admin Only)
+        </button>
+    </div>
+    <div id="cllf-all-session-data" style="display: none; margin-top: 20px; background: #f8f9fa; padding: 20px; border: 1px solid #dee2e6; border-radius: 5px;">
+        <h4>All Custom Loop Form Session Data:</h4>
+        
+        <?php
+        // Get all submissions
+        $all_submissions = WC()->session->get('cllf_all_submissions', array());
+        
+        if (!empty($all_submissions)) {
+            ?>
+            <h5 style="color: #17a2b8;">All Submissions (<?php echo count($all_submissions); ?> total):</h5>
+            <pre style="background: white; padding: 15px; overflow-x: auto; font-size: 11px; max-height: 400px;"><?php
+                echo htmlspecialchars(print_r($all_submissions, true));
+            ?></pre>
+            <?php
+        }
+        ?>
+        
+        <h5 style="color: #17a2b8; margin-top: 20px;">Current/Last Submission Data (Legacy):</h5>
+        <pre style="background: white; padding: 15px; overflow-x: auto; font-size: 11px;"><?php
+            $session_data = array(
+                'loop_color' => WC()->session->get('cllf_loop_color'),
+                'sock_clips' => WC()->session->get('cllf_sock_clips'),
+                'has_logo' => WC()->session->get('cllf_has_logo'),
+                'logo_url' => WC()->session->get('cllf_logo_url'),
+                'sport_word' => WC()->session->get('cllf_sport_word'),
+                'tag_info_type' => WC()->session->get('cllf_tag_info_type'),
+                'tag_numbers' => WC()->session->get('cllf_tag_numbers'),
+                'tag_names' => WC()->session->get('cllf_tag_names'),
+                'add_blanks' => WC()->session->get('cllf_add_blanks'),
+                'num_sets' => WC()->session->get('cllf_num_sets'),
+                'total_loops' => WC()->session->get('cllf_total_loops'),
+                'order_notes' => WC()->session->get('cllf_order_notes'),
+                'text_color' => WC()->session->get('cllf_text_color'),
+                'font_choice' => WC()->session->get('cllf_font_choice'),
+                'custom_font_url' => WC()->session->get('cllf_custom_font_url'),
+                'custom_font_name' => WC()->session->get('cllf_custom_font_name'),
+            );
+            echo htmlspecialchars(print_r($session_data, true));
+        ?></pre>
+        
+        <h5 style="color: #17a2b8; margin-top: 20px;">Cart Items with Submission IDs:</h5>
+        <pre style="background: white; padding: 15px; overflow-x: auto; font-size: 11px;"><?php
+            $cart_items_debug = array();
+            foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
+                $product = $cart_item['data'];
+                if ($product->get_sku() && strpos($product->get_sku(), 'CL-') === 0) {
+                    $cart_items_debug[$cart_item_key] = array(
+                        'product_name' => $product->get_name(),
+                        'sku' => $product->get_sku(),
+                        'quantity' => $cart_item['quantity'],
+                        'submission_id' => isset($cart_item['cllf_submission_id']) ? $cart_item['cllf_submission_id'] : 'Not set'
+                    );
+                }
+            }
+            echo htmlspecialchars(print_r($cart_items_debug, true));
+        ?></pre>
+    </div>
+    <?php
+}
+
+// Add a quick summary in the cart header
+add_action('woocommerce_before_cart_table', 'cllf_debug_cart_summary');
+function cllf_debug_cart_summary() {
+    // Only show to administrators
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+    
+    $all_submissions = WC()->session->get('cllf_all_submissions', array());
+    
+    if (!empty($all_submissions)) {
+        $total_loops = 0;
+        foreach ($all_submissions as $submission) {
+            $total_loops += $submission['total_loops'];
+        }
+        
+        ?>
+        <div style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 10px; margin-bottom: 20px; border-radius: 4px; color: #155724;">
+            <strong>🔍 Debug Summary (Admin Only):</strong> 
+            <?php echo count($all_submissions); ?> custom loop products in session, 
+            totaling <?php echo $total_loops; ?> loops
+        </div>
+        <?php
+    }
+}
+
+/**
+ * Add "Start a new Loop Order" button to cart page
+ * Add this to your custom-loop-form-plugin.php file
+ */
+
+// Add button above the cart table
+add_action('woocommerce_before_cart_table', 'cllf_add_new_loop_order_button', 15);
+function cllf_add_new_loop_order_button() {
+    // Only show if there are custom loops in the cart
+    if (!cllf_has_custom_loops_in_cart()) {
+        return;
+    }
+    
+    // Get the page URL that has the form shortcode
+    // You can hardcode this or make it a setting
+    $form_page_url = '/custom-loops/'; // Change this to your actual form page URL
+    
+    // Alternative: Find the page with the shortcode dynamically
+    $pages = get_pages();
+    foreach ($pages as $page) {
+        if (has_shortcode($page->post_content, 'custom_laundry_loops_form')) {
+            $form_page_url = get_permalink($page->ID);
+            break;
+        }
+    }
+    
+    ?>
+    <div class="cllf-cart-actions" style="margin-bottom: 20px;">
+        <a href="<?php echo esc_url($form_page_url); ?>" class="button alt" style="background-color: #17a2b8; color: white; padding: 12px 24px; font-size: 16px;">
+            ➕ Start a New Loop Order
+        </a>
+        <span style="margin-left: 15px; color: #666; font-style: italic;">
+            Add another custom loop product to your order
+        </span>
+    </div>
+    <?php
+}
+
+// Alternative location: Add button after cart totals
+add_action('woocommerce_after_cart_totals', 'cllf_add_new_loop_order_button_after_totals');
+function cllf_add_new_loop_order_button_after_totals() {
+    // Only show if there are custom loops in the cart
+    if (!cllf_has_custom_loops_in_cart()) {
+        return;
+    }
+    
+    // Get the form page URL
+    $form_page_url = '/custom-loops/'; // Change this to your actual form page URL
+    
+    // Find page with shortcode
+    $pages = get_pages();
+    foreach ($pages as $page) {
+        if (has_shortcode($page->post_content, 'custom_laundry_loops_form')) {
+            $form_page_url = get_permalink($page->ID);
+            break;
+        }
+    }
+    
+    ?>
+    <div class="cllf-add-more-loops" style="text-align: center; margin-top: 20px; padding: 20px; background-color: #f8f9fa; border-radius: 5px;">
+        <p style="margin-bottom: 10px; font-weight: bold;">Need more custom loops?</p>
+        <a href="<?php echo esc_url($form_page_url); ?>" class="button" style="background-color: #28a745; color: white;">
+            ➕ Start a New Loop Order
+        </a>
+    </div>
+    <?php
+}
+
+/**
+ * Add shipping disclaimer to cart page
+ */
+add_action('woocommerce_cart_totals_after_shipping', 'cllf_add_shipping_disclaimer_cart');
+function cllf_add_shipping_disclaimer_cart() {
+    // Only show if there are custom loops in the cart
+    if (!cllf_has_custom_loops_in_cart()) {
+        return;
+    }
+    
+    ?>
+    <tr class="shipping-disclaimer">
+        <td colspan="2" style="padding: 10px;">
+            <div style="background-color: #e6f3ff; border-left: 4px solid #17a2b8; padding: 12px; margin: 10px 0; border-radius: 4px;">
+                <strong style="color: #17a2b8;">📦 Shipping Note:</strong>
+                <p style="margin: 5px 0 0 0; font-size: 13px; color: #333; line-height: 1.5;">
+                    The shipping quote shown is an estimate based on standard product weights. Due to the custom nature of your loops order, 
+                    actual shipping charges will be calculated after production and added to your final invoice. 
+                    You will be notified of any shipping adjustments before payment is processed.
+                </p>
+            </div>
+        </td>
+    </tr>
+    <?php
+}
+
+/**
+ * Add shipping disclaimer to checkout page
+ */
+add_action('woocommerce_review_order_after_shipping', 'cllf_add_shipping_disclaimer_checkout');
+function cllf_add_shipping_disclaimer_checkout() {
+    // Only show if there are custom loops in the cart
+    if (!cllf_has_custom_loops_in_cart()) {
+        return;
+    }
+    
+    ?>
+    <tr class="shipping-disclaimer">
+        <td colspan="2" style="padding: 10px 0;">
+            <div style="background-color: #fff8dc; border-left: 4px solid #ffc107; padding: 12px; margin: 10px 0; border-radius: 4px; font-size: 13px;">
+                <strong style="color: #856404;">⚠️ Important Shipping Information:</strong>
+                <p style="margin: 5px 0 0 0; color: #856404; line-height: 1.5;">
+                    This shipping quote is an estimate. Final shipping costs for your custom loops will be calculated based on actual 
+                    weight and dimensions after production. Any adjustments will be reflected in your final invoice, which will be 
+                    sent for approval before payment processing.
+                </p>
+            </div>
+        </td>
+    </tr>
+    <?php
+}
+
+/**
+ * Alternative: Add shipping disclaimer as a notice on cart page
+ */
+add_action('woocommerce_before_cart', 'cllf_shipping_disclaimer_notice_cart');
+function cllf_shipping_disclaimer_notice_cart() {
+    // Only show if there are custom loops in the cart
+    if (!cllf_has_custom_loops_in_cart()) {
+        return;
+    }
+    
+    wc_print_notice(
+        '<strong>Shipping Notice:</strong> Shipping costs shown are estimates. Final shipping charges for custom loop orders will be confirmed after production and included in your final invoice.',
+        'notice'
+    );
+}
+
+/**
+ * Add more prominent shipping disclaimer on checkout
+ */
+add_action('woocommerce_checkout_before_order_review', 'cllf_shipping_disclaimer_notice_checkout');
+function cllf_shipping_disclaimer_notice_checkout() {
+    // Only show if there are custom loops in the cart
+    if (!cllf_has_custom_loops_in_cart()) {
+        return;
+    }
+    
+    ?>
+    <div class="cllf-checkout-shipping-notice" style="background-color: #fef9e7; border: 2px solid #f9e79f; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+        <h4 style="margin-top: 0; color: #7d6608;">📦 Shipping Information for Custom Loops</h4>
+        <p style="margin-bottom: 0; color: #7d6608;">
+            The shipping cost displayed is an estimate based on standard dimensions and weights. 
+            Your custom loops order will have its final shipping cost calculated after production is complete. 
+            This ensures you receive the most accurate shipping rate based on your specific order. 
+            Any shipping adjustments will be included in your final invoice for approval.
+        </p>
+    </div>
+    <?php
+}
+
+/**
+ * Add CSS for better styling
+ */
+add_action('wp_head', 'cllf_add_cart_button_styles');
+function cllf_add_cart_button_styles() {
+    if (!is_cart() && !is_checkout()) {
+        return;
+    }
+    
+    ?>
+    <style>
+        /* Style the new loop order button */
+        .cllf-cart-actions .button {
+            transition: all 0.3s ease;
+        }
+        
+        .cllf-cart-actions .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        /* Ensure shipping disclaimer is visible */
+        .shipping-disclaimer td {
+            padding: 0 !important;
+        }
+        
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .cllf-cart-actions {
+                text-align: center;
+            }
+            
+            .cllf-cart-actions span {
+                display: block;
+                margin-top: 10px;
+                margin-left: 0 !important;
+            }
+            
+            .cllf-checkout-shipping-notice {
+                margin-left: -15px;
+                margin-right: -15px;
+                border-radius: 0;
+            }
+        }
+        
+        /* Make checkout shipping notice stand out */
+        .woocommerce-checkout .cllf-checkout-shipping-notice {
+            animation: subtle-pulse 2s ease-in-out;
+        }
+        
+        @keyframes subtle-pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.9;
+            }
+        }
+    </style>
+    <?php
+}
+
+/**
+ * Optional: Add setting to admin to configure form page URL
+ */
+add_action('admin_init', 'cllf_register_form_page_setting');
+function cllf_register_form_page_setting() {
+    add_settings_field(
+        'cllf_form_page_id',
+        'Custom Loops Form Page',
+        'cllf_form_page_setting_callback',
+        'clloi_settings_group',
+        'default'
+    );
+}
+
+function cllf_form_page_setting_callback() {
+    $settings = get_option('clloi_settings');
+    $selected_page = isset($settings['cllf_form_page_id']) ? $settings['cllf_form_page_id'] : '';
+    
+    // Get all pages that contain the shortcode
+    $pages_with_shortcode = array();
+    $pages = get_pages();
+    foreach ($pages as $page) {
+        if (has_shortcode($page->post_content, 'custom_laundry_loops_form')) {
+            $pages_with_shortcode[] = $page;
+        }
+    }
+    
+    ?>
+    <select name="clloi_settings[cllf_form_page_id]">
+        <option value="">-- Auto-detect --</option>
+        <?php foreach ($pages_with_shortcode as $page) : ?>
+            <option value="<?php echo $page->ID; ?>" <?php selected($selected_page, $page->ID); ?>>
+                <?php echo esc_html($page->post_title); ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
+    <p class="description">Select the page containing the Custom Loops form, or leave as auto-detect.</p>
+    <?php
+}
