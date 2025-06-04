@@ -6,7 +6,7 @@
  * Plugin Name:          Custom Laundry Loops Form
  * Plugin URI:           https://www.texontowel.com
  * Description:          Display a custom form for ordering custom laundry loops directly on the frontend.
- * Version:              2.3
+ * Version:              2.3.1
  * Author:               Texon Towel
  * Author URI:           https://www.texontowel.com
  * Developer:            Ryan Ours
@@ -2686,16 +2686,7 @@ function cllf_add_new_loop_order_button() {
     
     // Get the page URL that has the form shortcode
     // You can hardcode this or make it a setting
-    $form_page_url = '/custom-loops/'; // Change this to your actual form page URL
-    
-    // Alternative: Find the page with the shortcode dynamically
-    $pages = get_pages();
-    foreach ($pages as $page) {
-        if (has_shortcode($page->post_content, 'custom_laundry_loops_form')) {
-            $form_page_url = get_permalink($page->ID);
-            break;
-        }
-    }
+    $form_page_url = cllf_get_form_page_url();
     
     ?>
     <div class="cllf-cart-actions" style="margin-bottom: 20px;">
@@ -2718,16 +2709,7 @@ function cllf_add_new_loop_order_button_after_totals() {
     }
     
     // Get the form page URL
-    $form_page_url = '/custom-loops/'; // Change this to your actual form page URL
-    
-    // Find page with shortcode
-    $pages = get_pages();
-    foreach ($pages as $page) {
-        if (has_shortcode($page->post_content, 'custom_laundry_loops_form')) {
-            $form_page_url = get_permalink($page->ID);
-            break;
-        }
-    }
+    $form_page_url = cllf_get_form_page_url();
     
     ?>
     <div class="cllf-add-more-loops" style="text-align: center; margin-top: 20px; padding: 20px; background-color: #f8f9fa; border-radius: 5px;">
@@ -2893,41 +2875,28 @@ function cllf_add_cart_button_styles() {
 }
 
 /**
- * Optional: Add setting to admin to configure form page URL
+ * Then update your button functions to use this saved setting
+ * Replace the form page URL detection in your button functions with this:
  */
-add_action('admin_init', 'cllf_register_form_page_setting');
-function cllf_register_form_page_setting() {
-    add_settings_field(
-        'cllf_form_page_id',
-        'Custom Loops Form Page',
-        'cllf_form_page_setting_callback',
-        'clloi_settings_group',
-        'default'
-    );
-}
-
-function cllf_form_page_setting_callback() {
+function cllf_get_form_page_url() {
+    // First try to get from settings
     $settings = get_option('clloi_settings');
-    $selected_page = isset($settings['cllf_form_page_id']) ? $settings['cllf_form_page_id'] : '';
-    
-    // Get all pages that contain the shortcode
-    $pages_with_shortcode = array();
-    $pages = get_pages();
-    foreach ($pages as $page) {
-        if (has_shortcode($page->post_content, 'custom_laundry_loops_form')) {
-            $pages_with_shortcode[] = $page;
+    if (!empty($settings['cllf_form_page_id'])) {
+        $page_id = $settings['cllf_form_page_id'];
+        $page_url = get_permalink($page_id);
+        if ($page_url) {
+            return $page_url;
         }
     }
     
-    ?>
-    <select name="clloi_settings[cllf_form_page_id]">
-        <option value="">-- Auto-detect --</option>
-        <?php foreach ($pages_with_shortcode as $page) : ?>
-            <option value="<?php echo $page->ID; ?>" <?php selected($selected_page, $page->ID); ?>>
-                <?php echo esc_html($page->post_title); ?>
-            </option>
-        <?php endforeach; ?>
-    </select>
-    <p class="description">Select the page containing the Custom Loops form, or leave as auto-detect.</p>
-    <?php
+    // Fallback to auto-detection
+    $pages = get_pages();
+    foreach ($pages as $page) {
+        if (has_shortcode($page->post_content, 'custom_laundry_loops_form')) {
+            return get_permalink($page->ID);
+        }
+    }
+    
+    // Last resort - return home URL with a hash
+    return home_url('/#custom-loops-form');
 }

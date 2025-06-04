@@ -44,6 +44,53 @@ function cllf_settings_page() {
             <p>This plugin shares settings with the Custom Laundry Loops Order Importer plugin. Changes made here will affect both plugins.</p>
         </div>
         
+        <h2>Form Page Settings</h2>
+        <table class="form-table">
+            <tr>
+                <th scope="row">
+                    <label for="cllf_form_page_id">Custom Loops Form Page</label>
+                </th>
+                <td>
+                    <?php
+                    $selected_page = isset($clloi_settings['cllf_form_page_id']) ? $clloi_settings['cllf_form_page_id'] : '';
+                    
+                    // Get all pages that contain the shortcode
+                    $pages_with_shortcode = array();
+                    $pages = get_pages();
+                    foreach ($pages as $page) {
+                        if (has_shortcode($page->post_content, 'custom_laundry_loops_form')) {
+                            $pages_with_shortcode[] = $page;
+                        }
+                    }
+                    ?>
+                    <select id="cllf_form_page_id" name="clloi_settings[cllf_form_page_id]">
+                        <option value="">-- Auto-detect --</option>
+                        <?php foreach ($pages_with_shortcode as $page) : ?>
+                            <option value="<?php echo $page->ID; ?>" <?php selected($selected_page, $page->ID); ?>>
+                                <?php echo esc_html($page->post_title); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="description">Select the page containing the Custom Loops form, or leave as auto-detect. This will be used for the "Start a New Loop Order" button.</p>
+                    
+                    <?php if (!empty($pages_with_shortcode)) : ?>
+                        <p class="description" style="margin-top: 10px;">
+                            <strong>Pages with form shortcode found:</strong><br>
+                            <?php foreach ($pages_with_shortcode as $page) : ?>
+                                • <?php echo esc_html($page->post_title); ?> 
+                                (<a href="<?php echo get_permalink($page->ID); ?>" target="_blank">View</a> | 
+                                <a href="<?php echo get_edit_post_link($page->ID); ?>" target="_blank">Edit</a>)<br>
+                            <?php endforeach; ?>
+                        </p>
+                    <?php else : ?>
+                        <p class="description" style="margin-top: 10px; color: #d63638;">
+                            <strong>Warning:</strong> No pages found containing the [custom_laundry_loops_form] shortcode.
+                        </p>
+                    <?php endif; ?>
+                </td>
+            </tr>
+        </table>
+        
         <form method="post" action="options.php">
             <?php settings_fields('clloi_settings_group'); ?>
             <?php do_settings_sections('clloi_settings_group'); ?>
