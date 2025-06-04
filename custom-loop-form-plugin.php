@@ -6,7 +6,7 @@
  * Plugin Name:          Custom Laundry Loops Form
  * Plugin URI:           https://www.texontowel.com
  * Description:          Display a custom form for ordering custom laundry loops directly on the frontend.
- * Version:              2.3.1
+ * Version:              2.3.2
  * Author:               Texon Towel
  * Author URI:           https://www.texontowel.com
  * Developer:            Ryan Ours
@@ -2406,6 +2406,11 @@ add_filter(
 // Add debug display to cart page
 add_action('woocommerce_before_cart', 'cllf_debug_display_all_submissions');
 function cllf_debug_display_all_submissions() {
+    // Check if debug mode is enabled
+    if (!cllf_is_debug_mode_enabled()) {
+        return;
+    }
+    
     // Only show to administrators
     if (!current_user_can('manage_options')) {
         return;
@@ -2496,6 +2501,11 @@ function cllf_debug_display_all_submissions() {
 // Alternative: Add debug info to the cart totals area
 add_action('woocommerce_cart_totals_after_order_total', 'cllf_debug_names_in_totals');
 function cllf_debug_names_in_totals() {
+    // Check if debug mode is enabled
+    if (!cllf_is_debug_mode_enabled()) {
+        return;
+    }
+    
     // Only show to administrators
     if (!current_user_can('manage_options')) {
         return;
@@ -2574,6 +2584,11 @@ function cllf_debug_names_in_totals() {
 // Add a button to view all session data
 add_action('woocommerce_proceed_to_checkout', 'cllf_debug_session_button', 999);
 function cllf_debug_session_button() {
+    // Check if debug mode is enabled
+    if (!cllf_is_debug_mode_enabled()) {
+        return;
+    }
+    
     // Only show to administrators
     if (!current_user_can('manage_options')) {
         return;
@@ -2648,6 +2663,11 @@ function cllf_debug_session_button() {
 // Add a quick summary in the cart header
 add_action('woocommerce_before_cart_table', 'cllf_debug_cart_summary');
 function cllf_debug_cart_summary() {
+    // Check if debug mode is enabled
+    if (!cllf_is_debug_mode_enabled()) {
+        return;
+    }
+    
     // Only show to administrators
     if (!current_user_can('manage_options')) {
         return;

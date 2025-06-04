@@ -44,56 +44,71 @@ function cllf_settings_page() {
             <p>This plugin shares settings with the Custom Laundry Loops Order Importer plugin. Changes made here will affect both plugins.</p>
         </div>
         
-        <h2>Form Page Settings</h2>
-        <table class="form-table">
-            <tr>
-                <th scope="row">
-                    <label for="cllf_form_page_id">Custom Loops Form Page</label>
-                </th>
-                <td>
-                    <?php
-                    $selected_page = isset($clloi_settings['cllf_form_page_id']) ? $clloi_settings['cllf_form_page_id'] : '';
-                    
-                    // Get all pages that contain the shortcode
-                    $pages_with_shortcode = array();
-                    $pages = get_pages();
-                    foreach ($pages as $page) {
-                        if (has_shortcode($page->post_content, 'custom_laundry_loops_form')) {
-                            $pages_with_shortcode[] = $page;
-                        }
-                    }
-                    ?>
-                    <select id="cllf_form_page_id" name="clloi_settings[cllf_form_page_id]">
-                        <option value="">-- Auto-detect --</option>
-                        <?php foreach ($pages_with_shortcode as $page) : ?>
-                            <option value="<?php echo $page->ID; ?>" <?php selected($selected_page, $page->ID); ?>>
-                                <?php echo esc_html($page->post_title); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <p class="description">Select the page containing the Custom Loops form, or leave as auto-detect. This will be used for the "Start a New Loop Order" button.</p>
-                    
-                    <?php if (!empty($pages_with_shortcode)) : ?>
-                        <p class="description" style="margin-top: 10px;">
-                            <strong>Pages with form shortcode found:</strong><br>
-                            <?php foreach ($pages_with_shortcode as $page) : ?>
-                                • <?php echo esc_html($page->post_title); ?> 
-                                (<a href="<?php echo get_permalink($page->ID); ?>" target="_blank">View</a> | 
-                                <a href="<?php echo get_edit_post_link($page->ID); ?>" target="_blank">Edit</a>)<br>
-                            <?php endforeach; ?>
-                        </p>
-                    <?php else : ?>
-                        <p class="description" style="margin-top: 10px; color: #d63638;">
-                            <strong>Warning:</strong> No pages found containing the [custom_laundry_loops_form] shortcode.
-                        </p>
-                    <?php endif; ?>
-                </td>
-            </tr>
-        </table>
-        
         <form method="post" action="options.php">
             <?php settings_fields('clloi_settings_group'); ?>
             <?php do_settings_sections('clloi_settings_group'); ?>
+            
+            <h2>Debug Settings</h2>
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="cllf_debug_mode">Debug Mode</label>
+                    </th>
+                    <td>
+                        <input type="checkbox" id="cllf_debug_mode" name="clloi_settings[cllf_debug_mode]" value="1" 
+                               <?php checked(isset($clloi_settings['cllf_debug_mode']) ? $clloi_settings['cllf_debug_mode'] : 0, 1); ?> />
+                        <label for="cllf_debug_mode">Enable administrator debug mode</label>
+                        <p class="description">When enabled, administrators will see detailed debug information on the cart page including all custom loop submissions, session data, and product details.</p>
+                    </td>
+                </tr>
+            </table>
+            
+            <h2>Form Page Settings</h2>
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="cllf_form_page_id">Custom Loops Form Page</label>
+                    </th>
+                    <td>
+                        <?php
+                        $selected_page = isset($clloi_settings['cllf_form_page_id']) ? $clloi_settings['cllf_form_page_id'] : '';
+                        
+                        // Get all pages that contain the shortcode
+                        $pages_with_shortcode = array();
+                        $pages = get_pages();
+                        foreach ($pages as $page) {
+                            if (has_shortcode($page->post_content, 'custom_laundry_loops_form')) {
+                                $pages_with_shortcode[] = $page;
+                            }
+                        }
+                        ?>
+                        <select id="cllf_form_page_id" name="clloi_settings[cllf_form_page_id]">
+                            <option value="">-- Auto-detect --</option>
+                            <?php foreach ($pages_with_shortcode as $page) : ?>
+                                <option value="<?php echo $page->ID; ?>" <?php selected($selected_page, $page->ID); ?>>
+                                    <?php echo esc_html($page->post_title); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="description">Select the page containing the Custom Loops form, or leave as auto-detect. This will be used for the "Start a New Loop Order" button.</p>
+                        
+                        <?php if (!empty($pages_with_shortcode)) : ?>
+                            <p class="description" style="margin-top: 10px;">
+                                <strong>Pages with form shortcode found:</strong><br>
+                                <?php foreach ($pages_with_shortcode as $page) : ?>
+                                    • <?php echo esc_html($page->post_title); ?> 
+                                    (<a href="<?php echo get_permalink($page->ID); ?>" target="_blank">View</a> | 
+                                    <a href="<?php echo get_edit_post_link($page->ID); ?>" target="_blank">Edit</a>)<br>
+                                <?php endforeach; ?>
+                            </p>
+                        <?php else : ?>
+                            <p class="description" style="margin-top: 10px; color: #d63638;">
+                                <strong>Warning:</strong> No pages found containing the [custom_laundry_loops_form] shortcode.
+                            </p>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            </table>
             
             <h2>Sublimation Product IDs</h2>
             <table class="form-table">
@@ -209,11 +224,29 @@ function cllf_settings_page() {
     <?php
 }
 
-// Add settings link to plugins page
-add_filter('plugin_action_links_' . plugin_basename(CLLF_PLUGIN_DIR . 'custom-laundry-loops-form.php'), 'cllf_add_settings_link');
+// Add settings link to plugins page - more flexible approach
+add_filter('plugin_action_links', 'cllf_add_settings_link', 10, 2);
 
-function cllf_add_settings_link($links) {
-    $settings_link = '<a href="options-general.php?page=cllf-settings">Settings</a>';
-    array_unshift($links, $settings_link);
+function cllf_add_settings_link($links, $file) {
+    // Get the base plugin file by checking if our constant is defined
+    if (defined('CLLF_PLUGIN_DIR')) {
+        $plugin_basename = plugin_basename(CLLF_PLUGIN_DIR . basename($file));
+        $current_plugin = plugin_basename($file);
+        
+        // Check if this is our plugin by comparing the directory
+        if (dirname($current_plugin) === dirname($plugin_basename) || 
+            strpos($file, 'custom-loop-form-plugin.php') !== false) {
+            $settings_link = '<a href="' . admin_url('options-general.php?page=cllf-settings') . '">Settings</a>';
+            array_unshift($links, $settings_link);
+        }
+    }
     return $links;
+}
+
+/**
+ * Helper function to check if debug mode is enabled
+ */
+function cllf_is_debug_mode_enabled() {
+    $settings = get_option('clloi_settings', array());
+    return isset($settings['cllf_debug_mode']) && $settings['cllf_debug_mode'] == 1;
 }

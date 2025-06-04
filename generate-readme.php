@@ -134,7 +134,7 @@ function create_version_entries($commits) {
 	];
 	
 	// Get the latest version for future versioning
-	$latest_version = '2.1'; // Default start
+	$latest_version = '2.3.2'; // Default start
 	
 	// Determine highest known version
 	foreach ($known_versions as $sha => $version) {
