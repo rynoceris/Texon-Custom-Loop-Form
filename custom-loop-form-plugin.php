@@ -275,7 +275,7 @@ function cllf_handle_form_submission() {
             }
             
             // Validate file type
-            $allowed_types = array('image/jpeg', 'image/png', 'image/svg+xml', 'application/pdf', 'application/illustrator');
+            $allowed_types = array('image/jpeg', 'image/png', 'image/svg+xml', 'application/pdf', 'application/illustrator', 'application/postscript', 'application/eps', 'image/eps', 'application/vnd.adobe.illustrator', '.ai');
             $file_type = wp_check_filetype(basename($logo_file['name']));
             
             if (!in_array($logo_file['type'], $allowed_types)) {
@@ -784,9 +784,9 @@ function cllf_process_order_and_add_to_cart($loop_color, $sock_clips, $total_loo
     }
     
     // Get sublimation product IDs
-    $sublimation_product_1 = isset($clloi_settings['clloi_sublimation_product_1']) ? $clloi_settings['clloi_sublimation_product_1'] : 49143;
-    $sublimation_product_2 = isset($clloi_settings['clloi_sublimation_product_2']) ? $clloi_settings['clloi_sublimation_product_2'] : 49133;
-    $sublimation_product_3 = isset($clloi_settings['clloi_sublimation_product_3']) ? $clloi_settings['clloi_sublimation_product_3'] : 49132;
+    $sublimation_product_1 = isset($clloi_settings['clloi_sublimation_product_1']) ? $clloi_settings['clloi_sublimation_product_1'] : 49360;
+    $sublimation_product_2 = isset($clloi_settings['clloi_sublimation_product_2']) ? $clloi_settings['clloi_sublimation_product_2'] : 49361;
+    $sublimation_product_3 = isset($clloi_settings['clloi_sublimation_product_3']) ? $clloi_settings['clloi_sublimation_product_3'] : 49359;
     
     // RADICAL NEW APPROACH: Temporarily disable all hooks
     
@@ -2397,6 +2397,14 @@ add_filter(
     10,
     3
 );
+
+/**
+ * Helper function to check if debug mode is enabled
+ */
+function cllf_is_debug_mode_enabled() {
+    $settings = get_option('clloi_settings', array());
+    return isset($settings['cllf_debug_mode']) && $settings['cllf_debug_mode'] == 1;
+}
 
 /**
  * Updated debug functions to display ALL custom loop products data

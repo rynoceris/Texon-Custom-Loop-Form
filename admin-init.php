@@ -242,11 +242,3 @@ function cllf_add_settings_link($links, $file) {
     }
     return $links;
 }
-
-/**
- * Helper function to check if debug mode is enabled
- */
-function cllf_is_debug_mode_enabled() {
-    $settings = get_option('clloi_settings', array());
-    return isset($settings['cllf_debug_mode']) && $settings['cllf_debug_mode'] == 1;
-}
