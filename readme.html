@@ -65,10 +65,10 @@
 		<p><strong>Requires WordPress:</strong> 6.5+</p>
 		<p><strong>Tested up to:</strong> 6.8.2</p>
 		<p><strong>Requires WooCommerce:</strong> 8.8.x+</p>
-		<p><strong>Tested up to:</strong> 10.0.2</p>
+		<p><strong>Tested up to:</strong> 10.1.2</p>
 		<p><strong>Requires PHP:</strong> 8.1</p>
-		<p><strong>Tested up to:</strong> 8.2.28</p>
-		<p><strong>Stable tag:</strong> 2.1</p>
+		<p><strong>Tested up to:</strong> 8.2.27</p>
+		<p><strong>Stable tag:</strong> 2.3.3</p>
 		<p><strong>License:</strong> GPLv3 or later</p>
 		<p><strong>License URI:</strong> <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">https://www.gnu.org/licenses/gpl-3.0.en.html</a></p>
 	</div>
@@ -105,7 +105,91 @@
 	<h3>Can customers upload their own logos?</h3>
 	<p>Yes, the form includes an option for logo upload in various formats including PNG, JPG, SVG, AI, and PDF.</p>
 	
-	<h2>Changelog</h2>	
+	<h2>Changelog</h2>
+	
+	<div class="changelog-item">
+		<h3>Version 2.3.3 - September 2025</h3>
+		<ul>
+			<li><strong>Fixed:</strong> Multi-session cart quantity calculation issues where sublimation tag quantities would revert during checkout and order placement</li>
+			<li><strong>Fixed:</strong> Cart validation errors appearing on cart and checkout pages when quantities were already correct</li>
+			<li><strong>Fixed:</strong> Order confirmation showing incorrect sublimation tag quantities (46 instead of correct total)</li>
+			<li><strong>Improved:</strong> Cart session persistence and state management across multiple user sessions</li>
+			<li><strong>Improved:</strong> Protection system now properly bypasses validation during programmatic cart fixes</li>
+			<li><strong>Enhanced:</strong> Multi-layered cart fix system with early template redirect, cart validation, and final checkout hooks</li>
+			<li><strong>Updated:</strong> Tested compatibility with WordPress 6.8.2 and WooCommerce 10.1.2</li>
+		</ul>
+	</div>
+
+	<div class="changelog-item">
+		<h3>Version 2.3.2 - July 2025</h3>
+		<ul>
+			<li><strong>Fixed:</strong> WooCommerce session saving bug diagnostics</li>
+			<li><strong>Added:</strong> Ability to turn admin debug mode on/off</li>
+			<li><strong>Enhanced:</strong> Display debug/diagnostic information on cart page for administrators</li>
+		</ul>
+	</div>
+
+	<div class="changelog-item">
+		<h3>Version 2.3.1 - June 2025</h3>
+		<ul>
+			<li><strong>Added:</strong> Shortcode page detection to wp-admin settings page</li>
+		</ul>
+	</div>
+
+	<div class="changelog-item">
+		<h3>Version 2.3 - June 2025</h3>
+		<ul>
+			<li><strong>Enhanced:</strong> Cart Protection system with multiple custom loop products support</li>
+			<li><strong>Improved:</strong> Admin display functionality</li>
+			<li><strong>Updated:</strong> Email notification system</li>
+			<li><strong>Enhanced:</strong> Debug tools and diagnostics</li>
+			<li><strong>Improved:</strong> Cart page functionality and user experience</li>
+			<li><strong>Added:</strong> Shipping disclaimers and notices</li>
+			<li><strong>Enhanced:</strong> Technical improvements and data integrity</li>
+		</ul>
+	</div>
+
+	<div class="changelog-item">
+		<h3>Version 2.2 - May 2025</h3>
+		<ul>
+			<li><strong>Added:</strong> Automatic readme.html file creation from GitHub commit history</li>
+			<li><strong>Implemented:</strong> Readme update mechanism</li>
+			<li><strong>Added:</strong> "View details" link in WordPress plugins screen</li>
+			<li><strong>Created:</strong> Helper functions for secure token encryption</li>
+		</ul>
+	</div>
+
+	<div class="changelog-item">
+		<h3>Version 2.1 - May 2025</h3>
+		<ul>
+			<li><strong>Enhanced:</strong> Larger form question fonts for better readability</li>
+			<li><strong>Updated:</strong> Strap color options and selection</li>
+			<li><strong>Improved:</strong> Font and color selection interface</li>
+			<li><strong>Enhanced:</strong> Form preview functionality</li>
+			<li><strong>Improved:</strong> Cart and checkout interactions</li>
+			<li><strong>Multiple:</strong> UI and functionality improvements</li>
+		</ul>
+	</div>
+
+	<div class="changelog-item">
+		<h3>Version 2.0 - April 2025</h3>
+		<ul>
+			<li><strong>Added:</strong> Dynamically updated preview system</li>
+			<li><strong>Implemented:</strong> Custom font upload functionality</li>
+			<li><strong>Added:</strong> Font color selection from uploaded logo</li>
+			<li><strong>Enhanced:</strong> Form functionality and user experience</li>
+		</ul>
+	</div>
+
+	<div class="changelog-item">
+		<h3>Version 1.0 - April 2025</h3>
+		<ul>
+			<li><strong>Initial:</strong> Plugin repository created</li>
+			<li><strong>Core:</strong> Basic custom laundry loops form functionality</li>
+			<li><strong>Foundation:</strong> WooCommerce integration and cart management</li>
+		</ul>
+	</div>
+	
 	<div class="footer">
 		<p>© 2025 Texon Towel - Custom Laundry Loops Form Plugin</p>
 	</div>

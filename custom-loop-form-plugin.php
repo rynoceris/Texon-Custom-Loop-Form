@@ -6,15 +6,15 @@
  * Plugin Name:          Custom Laundry Loops Form
  * Plugin URI:           https://www.texontowel.com
  * Description:          Display a custom form for ordering custom laundry loops directly on the frontend.
- * Version:              2.3.2
+ * Version:              2.3.3
  * Author:               Texon Towel
  * Author URI:           https://www.texontowel.com
  * Developer:            Ryan Ours
  * Copyright:            © 2025 Texon Towel (email : sales@texontowel.com).
  * License: GNU          General Public License v3.0
  * License URI:          http://www.gnu.org/licenses/gpl-3.0.html
- * Tested up to:         6.8.1
- * WooCommerce:          9.8.3
+ * Tested up to:         6.8.2
+ * WooCommerce:          10.1.2
  * PHP tested up to:     8.2.28
  */
 
@@ -415,199 +415,376 @@ function cllf_handle_direct_form_submission() {
  * Replace your existing cllf_handle_form_submission function with this temporarily
  * to debug why form data isn't being saved
  */
-function cllf_handle_form_submission() {
-    // Enhanced logging
-    error_log('=== CLLF FORM SUBMISSION DEBUG START ===');
-    error_log('POST data received: ' . print_r($_POST, true));
-    error_log('FILES data received: ' . print_r($_FILES, true));
-    
-    // Check if WooCommerce session is available
-    if (!function_exists('WC') || !WC()->session) {
-        error_log('ERROR: WooCommerce session not available');
-        wp_send_json_error('WooCommerce session not available');
-        exit;
-    }
-    
-    // Enhanced nonce verification with detailed logging
-    if (!isset($_POST['nonce'])) {
-        error_log('ERROR: No nonce value received in POST');
-        wp_send_json_error('Security check failed: Nonce is missing');
-        exit;
-    }
-    
-    $received_nonce = $_POST['nonce'];
-    error_log('Received nonce: ' . $received_nonce);
-    
-    if (!wp_verify_nonce($received_nonce, 'cllf-nonce')) {
-        error_log('ERROR: Nonce verification failed for value: ' . $received_nonce);
-        wp_send_json_error('Security check failed: Invalid nonce value');
-        exit;
-    }
-    
-    error_log('SUCCESS: Nonce verification passed');
-    
-    // Get and validate form data with detailed logging
-    $loop_color = isset($_POST['loop_color']) ? sanitize_text_field($_POST['loop_color']) : '';
-    $sock_clips = isset($_POST['sock_clips']) ? sanitize_text_field($_POST['sock_clips']) : '';
-    $has_logo = isset($_POST['has_logo']) ? sanitize_text_field($_POST['has_logo']) : 'No';
-    $sport_word = isset($_POST['sport_word']) ? sanitize_text_field($_POST['sport_word']) : '';
-    $tag_info_type = isset($_POST['tag_info_type']) ? sanitize_text_field($_POST['tag_info_type']) : '';
-    $tag_numbers = isset($_POST['tag_numbers']) ? array_map('intval', $_POST['tag_numbers']) : array();
-    $tag_names = isset($_POST['tag_names']) ? array_map('sanitize_text_field', $_POST['tag_names']) : array();
-    $add_blanks = isset($_POST['add_blanks']) ? intval($_POST['add_blanks']) : 0;
-    $num_sets = isset($_POST['num_sets']) ? intval($_POST['num_sets']) : 1;
-    $order_notes = isset($_POST['order_notes']) ? sanitize_textarea_field($_POST['order_notes']) : '';
-    $text_color = isset($_POST['text_color']) ? sanitize_text_field($_POST['text_color']) : '#000000';
-    
-    // Log extracted form data
-    error_log('Extracted form data:');
-    error_log('- Loop Color: ' . $loop_color);
-    error_log('- Sock Clips: ' . $sock_clips);
-    error_log('- Has Logo: ' . $has_logo);
-    error_log('- Sport Word: ' . $sport_word);
-    error_log('- Tag Info Type: ' . $tag_info_type);
-    error_log('- Tag Numbers: ' . print_r($tag_numbers, true));
-    error_log('- Tag Names: ' . print_r($tag_names, true));
-    error_log('- Num Sets: ' . $num_sets);
-    error_log('- Add Blanks: ' . $add_blanks);
-    
-    // Validate required fields with detailed logging
-    if (empty($loop_color)) {
-        error_log('ERROR: Loop color is empty');
-        wp_send_json_error('Please select a loop color');
-        exit;
-    }
-    
-    if (empty($sock_clips)) {
-        error_log('ERROR: Sock clips is empty');
-        wp_send_json_error('Please select sock clips type');
-        exit;
-    }
-    
-    if (empty($tag_info_type)) {
-        error_log('ERROR: Tag info type is empty');
-        wp_send_json_error('Please select tag information type');
-        exit;
-    }
-    
-    // Validate tag information
-    if ($tag_info_type === 'Numbers' && empty($tag_numbers)) {
-        error_log('ERROR: Numbers selected but no numbers provided');
-        wp_send_json_error('Please select at least one number');
-        exit;
-    } elseif ($tag_info_type === 'Names' && empty($tag_names)) {
-        error_log('ERROR: Names selected but no names provided');
-        wp_send_json_error('Please enter at least one name');
-        exit;
-    }
-    
-    error_log('SUCCESS: All required field validation passed');
-    
-    // Handle logo upload if applicable
-    $logo_url = '';
-    if ($has_logo === 'Yes') {
-        error_log('Processing logo upload...');
-        
-        if (isset($_FILES['logo_file']) && $_FILES['logo_file']['error'] === UPLOAD_ERR_OK) {
-            error_log('Logo file uploaded successfully');
-            // ... logo processing code ...
-            // For now, just log that we got the file
-            $logo_url = 'logo_processed';
-        } else {
-            error_log('No logo file uploaded or upload error occurred');
-        }
-    }
-    
-    // Calculate totals
-    $tag_count = ($tag_info_type === 'Numbers') ? count($tag_numbers) : count($tag_names);
-    $total_loops = ($tag_count * $num_sets) + $add_blanks;
-    
-    error_log('Calculated totals:');
-    error_log('- Tag Count: ' . $tag_count);
-    error_log('- Total Loops: ' . $total_loops);
-    
-    // Create submission data
-    $submission_id = uniqid('cllf_', true);
-    error_log('Generated submission ID: ' . $submission_id);
-    
-    $submission_data = array(
-        'submission_id' => $submission_id,
-        'timestamp' => current_time('mysql'),
-        'loop_color' => $loop_color,
-        'sock_clips' => $sock_clips,
-        'has_logo' => $has_logo,
-        'logo_url' => $logo_url,
-        'sport_word' => $sport_word,
-        'tag_info_type' => $tag_info_type,
-        'tag_numbers' => $tag_numbers,
-        'tag_names' => $tag_names,
-        'add_blanks' => $add_blanks,
-        'num_sets' => $num_sets,
-        'total_loops' => $total_loops,
-        'order_notes' => $order_notes,
-        'text_color' => $text_color,
-        'font_choice' => 'default'
-    );
-    
-    error_log('Created submission data: ' . print_r($submission_data, true));
-    
-    // Try to save to WooCommerce session
-    try {
-        // Get existing submissions or create new array
-        $all_submissions = WC()->session->get('cllf_all_submissions', array());
-        error_log('Retrieved existing submissions from session: ' . count($all_submissions) . ' items');
-        
-        // Add new submission
-        $all_submissions[$submission_id] = $submission_data;
-        
-        // Save all submissions
-        WC()->session->set('cllf_all_submissions', $all_submissions);
-        error_log('Saved submissions to session: ' . count($all_submissions) . ' items');
-        
-        // Also save individual session keys for backward compatibility
-        WC()->session->set('cllf_loop_color', $loop_color);
-        WC()->session->set('cllf_sock_clips', $sock_clips);
-        WC()->session->set('cllf_total_loops', $total_loops);
-        // ... etc
-        
-        error_log('Saved individual session keys for backward compatibility');
-        
-        // Verify the data was actually saved
-        $verification = WC()->session->get('cllf_all_submissions', array());
-        if (isset($verification[$submission_id])) {
-            error_log('SUCCESS: Data verification passed - submission was saved to session');
-        } else {
-            error_log('ERROR: Data verification failed - submission was NOT saved to session');
-            wp_send_json_error('Failed to save form data to session');
-            exit;
-        }
-        
-    } catch (Exception $e) {
-        error_log('ERROR: Exception while saving to session: ' . $e->getMessage());
-        wp_send_json_error('Failed to save form data: ' . $e->getMessage());
-        exit;
-    }
-    
-    // Process the order and add to cart
-    try {
-        error_log('Processing order and adding to cart...');
-        $cart_url = cllf_process_order_and_add_to_cart($loop_color, $sock_clips, $total_loops);
-        error_log('SUCCESS: Order processed and added to cart. Cart URL: ' . $cart_url);
-    } catch (Exception $e) {
-        error_log('ERROR: Exception while processing order: ' . $e->getMessage());
-        wp_send_json_error('Failed to add to cart: ' . $e->getMessage());
-        exit;
-    }
-    
-    error_log('=== CLLF FORM SUBMISSION DEBUG END - SUCCESS ===');
-    
-    // Return success
-    wp_send_json_success(array(
-        'cart_url' => $cart_url, 
-        'message' => 'Your custom loops have been added to the cart!',
-        'debug_submission_id' => $submission_id
-    ));
-}
+ function cllf_handle_form_submission() {
+     // Enhanced logging
+     error_log('=== CLLF FORM SUBMISSION DEBUG START ===');
+     error_log('POST data received: ' . print_r($_POST, true));
+     error_log('FILES data received: ' . print_r($_FILES, true));
+     
+     // Check if WooCommerce session is available
+     if (!function_exists('WC') || !WC()->session) {
+         error_log('ERROR: WooCommerce session not available');
+         wp_send_json_error('WooCommerce session not available');
+         exit;
+     }
+     
+     // Enhanced nonce verification with detailed logging
+     if (!isset($_POST['nonce'])) {
+         error_log('ERROR: No nonce value received in POST');
+         wp_send_json_error('Security check failed: Nonce is missing');
+         exit;
+     }
+     
+     $received_nonce = $_POST['nonce'];
+     error_log('Received nonce: ' . $received_nonce);
+     
+     if (!wp_verify_nonce($received_nonce, 'cllf-nonce')) {
+         error_log('ERROR: Nonce verification failed for value: ' . $received_nonce);
+         wp_send_json_error('Security check failed: Invalid nonce value');
+         exit;
+     }
+     
+     error_log('SUCCESS: Nonce verification passed');
+     
+     // Get and validate form data with detailed logging
+     $loop_color = isset($_POST['loop_color']) ? sanitize_text_field($_POST['loop_color']) : '';
+     $sock_clips = isset($_POST['sock_clips']) ? sanitize_text_field($_POST['sock_clips']) : '';
+     $has_logo = isset($_POST['has_logo']) ? sanitize_text_field($_POST['has_logo']) : 'No';
+     $sport_word = isset($_POST['sport_word']) ? sanitize_text_field($_POST['sport_word']) : '';
+     $tag_info_type = isset($_POST['tag_info_type']) ? sanitize_text_field($_POST['tag_info_type']) : '';
+     $tag_numbers = isset($_POST['tag_numbers']) ? array_map('intval', $_POST['tag_numbers']) : array();
+     $tag_names = isset($_POST['tag_names']) ? array_map('sanitize_text_field', $_POST['tag_names']) : array();
+     $add_blanks = isset($_POST['add_blanks']) ? intval($_POST['add_blanks']) : 0;
+     $num_sets = isset($_POST['num_sets']) ? intval($_POST['num_sets']) : 1;
+     $order_notes = isset($_POST['order_notes']) ? sanitize_textarea_field($_POST['order_notes']) : '';
+     $text_color = isset($_POST['text_color']) ? sanitize_text_field($_POST['text_color']) : '#000000';
+     
+     // Handle custom color
+     if ($text_color === 'custom' && isset($_POST['custom_color'])) {
+         $text_color = sanitize_text_field($_POST['custom_color']);
+     }
+     
+     // Enforce character limits
+     if (strlen($sport_word) > 20) {
+         $sport_word = substr($sport_word, 0, 20);
+     }
+     
+     // For names, enforce 20 character limit on each name
+     if ($tag_info_type === 'Names' && !empty($tag_names)) {
+         foreach ($tag_names as $key => $name) {
+             if (strlen($name) > 20) {
+                 $tag_names[$key] = substr($name, 0, 20);
+             }
+         }
+     }
+     
+     // Log extracted form data
+     error_log('Extracted form data:');
+     error_log('- Loop Color: ' . $loop_color);
+     error_log('- Sock Clips: ' . $sock_clips);
+     error_log('- Has Logo: ' . $has_logo);
+     error_log('- Sport Word: ' . $sport_word);
+     error_log('- Tag Info Type: ' . $tag_info_type);
+     error_log('- Tag Numbers: ' . print_r($tag_numbers, true));
+     error_log('- Tag Names: ' . print_r($tag_names, true));
+     error_log('- Num Sets: ' . $num_sets);
+     error_log('- Add Blanks: ' . $add_blanks);
+     
+     // Validate required fields with detailed logging
+     if (empty($loop_color)) {
+         error_log('ERROR: Loop color is empty');
+         wp_send_json_error('Please select a loop color');
+         exit;
+     }
+     
+     if (empty($sock_clips)) {
+         error_log('ERROR: Sock clips is empty');
+         wp_send_json_error('Please select sock clips type');
+         exit;
+     }
+     
+     if (empty($tag_info_type)) {
+         error_log('ERROR: Tag info type is empty');
+         wp_send_json_error('Please select tag information type');
+         exit;
+     }
+     
+     // Validate tag information
+     if ($tag_info_type === 'Numbers' && empty($tag_numbers)) {
+         error_log('ERROR: Numbers selected but no numbers provided');
+         wp_send_json_error('Please select at least one number');
+         exit;
+     } elseif ($tag_info_type === 'Names' && empty($tag_names)) {
+         error_log('ERROR: Names selected but no names provided');
+         wp_send_json_error('Please enter at least one name');
+         exit;
+     }
+     
+     error_log('SUCCESS: All required field validation passed');
+     
+     // Handle logo upload if applicable - FIXED VERSION
+     $logo_url = '';
+     if ($has_logo === 'Yes') {
+         error_log('Processing logo upload...');
+         
+         // Check if we're using a stored logo from a previous submission
+         if (isset($_POST['use_stored_logo']) && $_POST['use_stored_logo'] === 'yes') {
+             // If logo is stored in session storage (for cloned submissions)
+             if (isset($_POST['logo_in_session_storage']) && $_POST['logo_in_session_storage'] === 'yes') {
+                 // The logo data URL would be stored in session storage by JavaScript
+                 // We would need to retrieve it via AJAX or a separate endpoint
+                 // For now, we'll use the session stored URL if available
+                 $logo_url = WC()->session->get('cllf_logo_url');
+                 if ($logo_url) {
+                     error_log('Using stored logo URL from session: ' . $logo_url);
+                 } else {
+                     error_log('No stored logo URL found in session');
+                 }
+                 
+                 if (isset($_POST['stored_logo_name'])) {
+                     // Store the original filename for reference
+                     WC()->session->set('cllf_previous_logo_name', sanitize_text_field($_POST['stored_logo_name']));
+                 }
+             } else if (WC()->session->get('cllf_logo_url')) {
+                 // Use the logo URL from the previous submission stored in the session
+                 $logo_url = WC()->session->get('cllf_logo_url');
+                 error_log('Using logo URL from previous session: ' . $logo_url);
+             }
+         } else if (isset($_FILES['logo_file']) && $_FILES['logo_file']['error'] === UPLOAD_ERR_OK) {
+             // Process new logo upload
+             error_log('Processing new logo file upload');
+             $logo_file = $_FILES['logo_file'];
+             $upload_dir = wp_upload_dir();
+             $logo_dir = $upload_dir['basedir'] . '/cllf-uploads';
+             
+             // Create upload directory if needed
+             if (!file_exists($logo_dir)) {
+                 if (!mkdir($logo_dir, 0755, true)) {
+                     error_log('Failed to create upload directory: ' . $logo_dir);
+                     wp_send_json_error('Failed to create upload directory');
+                     exit;
+                 }
+             }
+             
+             // Check for upload errors
+             if ($logo_file['error'] !== UPLOAD_ERR_OK) {
+                 error_log('Logo upload failed with error code: ' . $logo_file['error']);
+                 wp_send_json_error('Logo upload failed with error code: ' . $logo_file['error']);
+                 exit;
+             }
+             
+             // Enhanced file type validation
+             $file_info = wp_check_filetype($logo_file['name']);
+             $file_ext = strtolower($file_info['ext']);
+             
+             // Define allowed file types
+             $allowed_mime_types = array(
+                 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/svg+xml',
+                 'application/pdf', 'application/postscript', 'application/illustrator'
+             );
+             
+             $allowed_extensions = array(
+                 'jpg', 'jpeg', 'png', 'gif', 'svg', 'pdf', 'ai', 'eps'
+             );
+             
+             error_log('File type check: Provided=' . $logo_file['type'] . ', Detected=' . $file_info['type'] .
+                       ', Extension=' . $file_ext);
+             
+             // Check both MIME type and extension
+             if (!in_array($logo_file['type'], $allowed_mime_types) && 
+                 !in_array($file_info['type'], $allowed_mime_types) && 
+                 !in_array($file_ext, $allowed_extensions)) {
+                 
+                 error_log('Invalid file type: ' . $logo_file['type'] . ' with extension: ' . $file_ext);
+                 wp_send_json_error('Invalid file type. Allowed formats: JPEG, PNG, GIF, SVG, PDF, AI, EPS');
+                 exit;
+             }
+             
+             // Generate unique filename
+             $filename = wp_unique_filename($logo_dir, $logo_file['name']);
+             $logo_path = $logo_dir . '/' . $filename;
+             
+             error_log('Saving logo to: ' . $logo_path);
+             
+             // Move uploaded file
+             if (move_uploaded_file($logo_file['tmp_name'], $logo_path)) {
+                 $logo_url = $upload_dir['baseurl'] . '/cllf-uploads/' . $filename;
+                 error_log('Logo saved successfully at: ' . $logo_url);
+             } else {
+                 error_log('Failed to move uploaded file from ' . $logo_file['tmp_name'] . ' to ' . $logo_path);
+                 wp_send_json_error('Failed to save logo file');
+                 exit;
+             }
+         } else {
+             error_log('Logo required but no file uploaded and no stored logo available');
+             wp_send_json_error('Please upload a logo file');
+             exit;
+         }
+     }
+     
+     // Handle font choice
+     $font_choice = isset($_POST['font_choice']) ? sanitize_text_field($_POST['font_choice']) : 'default';
+     
+     // Handle custom font upload if applicable
+     $custom_font_url = '';
+     $custom_font_name = '';
+     
+     if ($font_choice === 'new' && isset($_FILES['custom_font']) && $_FILES['custom_font']['error'] !== UPLOAD_ERR_NO_FILE) {
+         error_log('Processing custom font upload');
+         // Process the font upload
+         $font_file = $_FILES['custom_font'];
+         $upload_dir = wp_upload_dir();
+         $font_dir = $upload_dir['basedir'] . '/cllf-uploads/fonts';
+         
+         // Create fonts directory if needed
+         if (!file_exists($font_dir)) {
+             mkdir($font_dir, 0755, true);
+         }
+         
+         // Check for upload errors
+         if ($font_file['error'] !== UPLOAD_ERR_OK) {
+             error_log('Font upload failed with error code: ' . $font_file['error']);
+             wp_send_json_error('Font upload failed with error code: ' . $font_file['error']);
+             exit;
+         }
+         
+         // Validate file type
+         $allowed_extensions = array('.ttf', '.otf', '.woff', '.woff2', '.eot', '.ps');
+         $file_extension = strtolower(pathinfo($font_file['name'], PATHINFO_EXTENSION));
+         
+         if (!in_array('.' . $file_extension, $allowed_extensions)) {
+             error_log('Invalid font file type: ' . $file_extension);
+             wp_send_json_error('Invalid font file type. Allowed: TTF, OTF, WOFF, WOFF2, EOT, PS');
+             exit;
+         }
+         
+         // Generate unique filename
+         $filename = wp_unique_filename($font_dir, $font_file['name']);
+         $font_path = $font_dir . '/' . $filename;
+         
+         // Move uploaded file
+         if (move_uploaded_file($font_file['tmp_name'], $font_path)) {
+             $custom_font_url = $upload_dir['baseurl'] . '/cllf-uploads/fonts/' . $filename;
+             $custom_font_name = $font_file['name'];
+             error_log('Font saved successfully at: ' . $custom_font_url);
+         } else {
+             error_log('Failed to save font file');
+             wp_send_json_error('Failed to save font file');
+             exit;
+         }
+     }
+     
+     // Calculate total number of loops
+     $tag_count = ($tag_info_type === 'Numbers') ? count($tag_numbers) : count($tag_names);
+     $total_loops = ($tag_count * $num_sets) + $add_blanks;
+     
+     error_log('Calculated totals:');
+     error_log('- Tag Count: ' . $tag_count);
+     error_log('- Total Loops: ' . $total_loops);
+     
+     // Create a unique identifier for this submission
+     $submission_id = uniqid('cllf_', true);
+     error_log('Generated submission ID: ' . $submission_id);
+     
+     // Store this submission's data
+     $submission_data = array(
+         'submission_id' => $submission_id,
+         'timestamp' => current_time('mysql'),
+         'loop_color' => $loop_color,
+         'sock_clips' => $sock_clips,
+         'has_logo' => $has_logo,
+         'logo_url' => $logo_url,
+         'sport_word' => $sport_word,
+         'tag_info_type' => $tag_info_type,
+         'tag_numbers' => $tag_numbers,
+         'tag_names' => $tag_names,
+         'add_blanks' => $add_blanks,
+         'num_sets' => $num_sets,
+         'total_loops' => $total_loops,
+         'order_notes' => $order_notes,
+         'text_color' => $text_color,
+         'font_choice' => $font_choice,
+         'custom_font_url' => $custom_font_url,
+         'custom_font_name' => $custom_font_name
+     );
+     
+     error_log('Created submission data: ' . print_r($submission_data, true));
+     
+     // Try to save to WooCommerce session
+     try {
+         // Get existing submissions or create new array
+         $all_submissions = WC()->session->get('cllf_all_submissions', array());
+         error_log('Retrieved existing submissions from session: ' . count($all_submissions) . ' items');
+         
+         // Add new submission
+         $all_submissions[$submission_id] = $submission_data;
+         
+         // Save all submissions
+         WC()->session->set('cllf_all_submissions', $all_submissions);
+         error_log('Saved submissions to session: ' . count($all_submissions) . ' items');
+         
+         // Also save individual session keys for backward compatibility
+         WC()->session->set('cllf_loop_color', $loop_color);
+         WC()->session->set('cllf_sock_clips', $sock_clips);
+         WC()->session->set('cllf_has_logo', $has_logo);
+         WC()->session->set('cllf_logo_url', $logo_url);
+         WC()->session->set('cllf_sport_word', $sport_word);
+         WC()->session->set('cllf_tag_info_type', $tag_info_type);
+         WC()->session->set('cllf_tag_numbers', $tag_numbers);
+         WC()->session->set('cllf_tag_names', $tag_names);
+         WC()->session->set('cllf_add_blanks', $add_blanks);
+         WC()->session->set('cllf_num_sets', $num_sets);
+         WC()->session->set('cllf_total_loops', $total_loops);
+         WC()->session->set('cllf_order_notes', $order_notes);
+         WC()->session->set('cllf_text_color', $text_color);
+         WC()->session->set('cllf_font_choice', $font_choice);
+         
+         if ($custom_font_url) {
+             WC()->session->set('cllf_custom_font_url', $custom_font_url);
+             WC()->session->set('cllf_custom_font_name', $custom_font_name);
+         }
+         
+         error_log('Saved individual session keys for backward compatibility');
+         
+         // Store the submission ID in the current session for processing
+         WC()->session->set('cllf_current_submission_id', $submission_id);
+         
+         // Verify the data was actually saved
+         $verification = WC()->session->get('cllf_all_submissions', array());
+         if (isset($verification[$submission_id])) {
+             error_log('SUCCESS: Data verification passed - submission was saved to session');
+         } else {
+             error_log('ERROR: Data verification failed - submission was NOT saved to session');
+             wp_send_json_error('Failed to save form data to session');
+             exit;
+         }
+         
+     } catch (Exception $e) {
+         error_log('ERROR: Exception while saving to session: ' . $e->getMessage());
+         wp_send_json_error('Failed to save form data: ' . $e->getMessage());
+         exit;
+     }
+     
+     // Process the order and add to cart
+     try {
+         error_log('Processing order and adding to cart...');
+         $cart_url = cllf_process_order_and_add_to_cart($loop_color, $sock_clips, $total_loops);
+         error_log('SUCCESS: Order processed and added to cart. Cart URL: ' . $cart_url);
+     } catch (Exception $e) {
+         error_log('ERROR: Exception while processing order: ' . $e->getMessage());
+         wp_send_json_error('Failed to add to cart: ' . $e->getMessage());
+         exit;
+     }
+     
+     error_log('=== CLLF FORM SUBMISSION DEBUG END - SUCCESS ===');
+     
+     // Return success
+     wp_send_json_success(array(
+         'cart_url' => $cart_url, 
+         'message' => 'Your custom loops have been added to the cart!',
+         'debug_submission_id' => $submission_id
+     ));
+ }
 
 /**
  * Process the order and add items to cart
@@ -996,11 +1173,15 @@ function cllf_process_order_and_add_to_cart($loop_color, $sock_clips, $total_loo
     // 2. Create a new empty filter array (effectively disabling all hooks)
     $wp_filter = array();
     
+    // 2.5. Ensure cart is properly refreshed after adding the new product
+    WC()->cart->calculate_totals();
+    
     // 3. Count all loops in cart (including what we just added)
     $all_loops = 0;
     $setup_fee_exists = false;
     $setup_fee_cart_key = null;
     $per_loop_fee_cart_items = array();
+    $custom_loop_items_found = array();
     
     foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
         $product = $cart_item['data'];
@@ -1008,6 +1189,15 @@ function cllf_process_order_and_add_to_cart($loop_color, $sock_clips, $total_loo
         // Count all custom loops
         if ($product->get_sku() && strpos($product->get_sku(), 'CL-') === 0) {
             $all_loops += $cart_item['quantity'];
+            
+            // Debug: track what we found
+            $submission_id = isset($cart_item['cllf_submission_id']) ? $cart_item['cllf_submission_id'] : 'No ID';
+            $custom_loop_items_found[] = array(
+                'sku' => $product->get_sku(),
+                'name' => $product->get_name(),
+                'quantity' => $cart_item['quantity'],
+                'submission_id' => $submission_id
+            );
         }
         
         // Track sublimation fees
@@ -1022,6 +1212,13 @@ function cllf_process_order_and_add_to_cart($loop_color, $sock_clips, $total_loo
             }
         }
     }
+    
+    // Debug: Log what we found
+    error_log('=== CART LOOP CALCULATION DEBUG ===');
+    error_log('Total loops calculated: ' . $all_loops);
+    error_log('Custom loop items found: ' . print_r($custom_loop_items_found, true));
+    error_log('Setup fee exists: ' . ($setup_fee_exists ? 'YES' : 'NO'));
+    error_log('Per-loop fee items to remove: ' . count($per_loop_fee_cart_items));
     
     // 4. Only remove per-loop sublimation fee items from cart
     foreach ($per_loop_fee_cart_items as $cart_item_key) {
@@ -1205,54 +1402,141 @@ add_action('woocommerce_checkout_update_order_meta', 'cllf_save_form_data_to_ord
  * Replace your existing cllf_save_form_data_to_order function with this temporarily
  */
 function cllf_save_form_data_to_order($order_id) {
-    error_log('=== CLLF SAVE TO ORDER DEBUG START ===');
-    error_log('Order ID: ' . $order_id);
-    
-    if (!function_exists('WC') || !WC()->session) {
-        error_log('ERROR: WooCommerce session not available in save function');
-        return;
-    }
-    
-    // Get all submissions from session
-    $all_submissions = WC()->session->get('cllf_all_submissions', array());
-    error_log('Retrieved submissions from session: ' . count($all_submissions) . ' items');
-    
-    if (!empty($all_submissions)) {
-        error_log('Saving all submissions to order meta');
-        error_log('Submissions data: ' . print_r($all_submissions, true));
-        
-        // Save all submissions as order meta
-        $save_result = update_post_meta($order_id, '_cllf_all_submissions', $all_submissions);
-        error_log('Save result: ' . ($save_result ? 'SUCCESS' : 'FAILED'));
-        
-        // Verify the save worked
-        $verification = get_post_meta($order_id, '_cllf_all_submissions', true);
-        if ($verification && count($verification) === count($all_submissions)) {
-            error_log('SUCCESS: Verification passed - data was saved to order');
-        } else {
-            error_log('ERROR: Verification failed - data was NOT saved properly to order');
-            error_log('Verification data: ' . print_r($verification, true));
-        }
-        
-        // Clear session data
-        WC()->session->set('cllf_all_submissions', array());
-        error_log('Cleared session data');
-        
-    } else {
-        error_log('WARNING: No submissions found in session to save');
-        
-        // Check for legacy data as backup
-        $loop_color = WC()->session->get('cllf_loop_color');
-        if ($loop_color) {
-            error_log('Found legacy session data, saving as backup');
-            update_post_meta($order_id, '_cllf_loop_color', $loop_color);
-        } else {
-            error_log('ERROR: No form data found in session at all!');
-        }
-    }
-    
-    error_log('=== CLLF SAVE TO ORDER DEBUG END ===');
-}
+     error_log('=== CLLF SAVE TO ORDER DEBUG START ===');
+     error_log('Order ID: ' . $order_id);
+     
+     if (!function_exists('WC') || !WC()->session) {
+         error_log('ERROR: WooCommerce session not available in save function');
+         return;
+     }
+     
+     // Get all submissions from session
+     $all_submissions = WC()->session->get('cllf_all_submissions', array());
+     error_log('Retrieved submissions from session: ' . count($all_submissions) . ' items');
+     
+     if (!empty($all_submissions)) {
+         error_log('Saving all submissions to order meta');
+         
+         // Validate and clean logo URLs in submissions before saving
+         foreach ($all_submissions as $submission_id => &$submission) {
+             if (isset($submission['logo_url']) && !empty($submission['logo_url'])) {
+                 // Check if this is a placeholder value and try to get the real URL
+                 if ($submission['logo_url'] === 'logo_processed' || $submission['logo_url'] === 'using_previous_logo') {
+                     // Try to get the actual URL from session
+                     $actual_logo_url = WC()->session->get('cllf_logo_url');
+                     if ($actual_logo_url && $actual_logo_url !== 'logo_processed' && $actual_logo_url !== 'using_previous_logo') {
+                         $submission['logo_url'] = $actual_logo_url;
+                         error_log('Fixed logo URL from session for submission ' . $submission_id . ': ' . $actual_logo_url);
+                     } else {
+                         error_log('WARNING: Could not resolve logo URL for submission ' . $submission_id);
+                         // Leave the placeholder value for now, but log it
+                     }
+                 }
+                 
+                 error_log('Logo URL for submission ' . $submission_id . ': ' . $submission['logo_url']);
+             }
+         }
+         
+         // Save all submissions as order meta
+         $save_result = update_post_meta($order_id, '_cllf_all_submissions', $all_submissions);
+         error_log('Save result: ' . ($save_result ? 'SUCCESS' : 'FAILED'));
+         
+         // Also save individual submission data for each cart item
+         $order = wc_get_order($order_id);
+         $submission_index = 1;
+         
+         foreach ($order->get_items() as $item_id => $item) {
+             // Check if this item has a submission ID
+             $submission_id = $item->get_meta('cllf_submission_id');
+             
+             if ($submission_id && isset($all_submissions[$submission_id])) {
+                 // Save the submission data to the order item
+                 $submission_data = $all_submissions[$submission_id];
+                 
+                 // Add submission data as item meta
+                 wc_add_order_item_meta($item_id, '_cllf_submission_data', $submission_data);
+                 wc_add_order_item_meta($item_id, '_cllf_submission_index', $submission_index);
+                 
+                 error_log('Saved submission data to order item ' . $item_id . ' with submission ID: ' . $submission_id);
+                 
+                 $submission_index++;
+             }
+         }
+         
+         // Verify the save worked
+         $verification = get_post_meta($order_id, '_cllf_all_submissions', true);
+         if ($verification && count($verification) === count($all_submissions)) {
+             error_log('SUCCESS: Verification passed - data was saved to order');
+         } else {
+             error_log('ERROR: Verification failed - data was NOT saved properly to order');
+             error_log('Expected: ' . count($all_submissions) . ' submissions, Got: ' . (is_array($verification) ? count($verification) : 'not an array'));
+         }
+         
+         // Clear session data
+         WC()->session->set('cllf_all_submissions', array());
+         error_log('Cleared session data');
+         
+     } else {
+         error_log('WARNING: No submissions found in session to save');
+         
+         // Check for legacy data as backup
+         $loop_color = WC()->session->get('cllf_loop_color');
+         if ($loop_color) {
+             error_log('Found legacy session data, saving as backup');
+             
+             // Get the logo URL properly from session
+             $logo_url = WC()->session->get('cllf_logo_url');
+             if ($logo_url && ($logo_url === 'logo_processed' || $logo_url === 'using_previous_logo')) {
+                 error_log('WARNING: Legacy logo URL is placeholder: ' . $logo_url);
+                 // You might want to try to resolve this or set it to empty
+                 $logo_url = ''; // Clear invalid placeholder
+             }
+             
+             update_post_meta($order_id, '_cllf_loop_color', sanitize_text_field($loop_color));
+             update_post_meta($order_id, '_cllf_sock_clips', sanitize_text_field(WC()->session->get('cllf_sock_clips')));
+             update_post_meta($order_id, '_cllf_has_logo', sanitize_text_field(WC()->session->get('cllf_has_logo')));
+             update_post_meta($order_id, '_cllf_logo_url', sanitize_text_field($logo_url));
+             update_post_meta($order_id, '_cllf_sport_word', sanitize_text_field(WC()->session->get('cllf_sport_word')));
+             update_post_meta($order_id, '_cllf_tag_info_type', sanitize_text_field(WC()->session->get('cllf_tag_info_type')));
+             update_post_meta($order_id, '_cllf_tag_numbers', WC()->session->get('cllf_tag_numbers'));
+             update_post_meta($order_id, '_cllf_tag_names', WC()->session->get('cllf_tag_names'));
+             update_post_meta($order_id, '_cllf_text_color', sanitize_text_field(WC()->session->get('cllf_text_color')));
+             update_post_meta($order_id, '_cllf_add_blanks', intval(WC()->session->get('cllf_add_blanks')));
+             update_post_meta($order_id, '_cllf_num_sets', intval(WC()->session->get('cllf_num_sets')));
+             update_post_meta($order_id, '_cllf_total_loops', intval(WC()->session->get('cllf_total_loops')));
+             
+             if ($font_choice = WC()->session->get('cllf_font_choice')) {
+                 update_post_meta($order_id, '_cllf_font_choice', sanitize_text_field($font_choice));
+             }
+             
+             if ($custom_font_url = WC()->session->get('cllf_custom_font_url')) {
+                 update_post_meta($order_id, '_cllf_custom_font_url', sanitize_text_field($custom_font_url));
+                 update_post_meta($order_id, '_cllf_custom_font_name', sanitize_text_field(WC()->session->get('cllf_custom_font_name')));
+             }
+             
+             if ($order_notes = WC()->session->get('cllf_order_notes')) {
+                 update_post_meta($order_id, '_cllf_order_notes', sanitize_textarea_field($order_notes));
+             }
+         } else {
+             error_log('ERROR: No form data found in session at all!');
+         }
+     }
+     
+     // Clear all individual session data
+     $session_keys = array(
+         'cllf_loop_color', 'cllf_sock_clips', 'cllf_has_logo', 'cllf_logo_url',
+         'cllf_sport_word', 'cllf_tag_info_type', 'cllf_tag_numbers', 'cllf_tag_names',
+         'cllf_add_blanks', 'cllf_num_sets', 'cllf_total_loops', 'cllf_text_color',
+         'cllf_order_notes', 'cllf_custom_font_url', 'cllf_custom_font_name', 'cllf_font_choice',
+         'cllf_current_submission_id'
+     );
+     
+     foreach ($session_keys as $key) {
+         WC()->session->__unset($key);
+     }
+     
+     error_log('=== CLLF SAVE TO ORDER DEBUG END ===');
+ }
 
 /**
  * Store submission ID in order item meta
@@ -2786,17 +3070,25 @@ function cllf_init_custom_loop_gateway() {
     }
 }
 
-// Show only the custom gateway when cart has custom loops
+// Restrict custom loop payment gateway based on cart contents
+// - If cart contains custom loops: only show custom loop gateway
+// - If cart contains NO custom loops: hide custom loop gateway
 add_filter('woocommerce_available_payment_gateways', 'cllf_custom_loop_available_payment_gateways');
 function cllf_custom_loop_available_payment_gateways($available_gateways) {
-    if (!is_admin() && cllf_has_custom_loops_in_cart()) {
-        // If cart has custom loops, only make our custom gateway available
-        if (isset($available_gateways['cllf_custom_loop_gateway'])) {
-            return array('cllf_custom_loop_gateway' => $available_gateways['cllf_custom_loop_gateway']);
+    if (!is_admin()) {
+        if (cllf_has_custom_loops_in_cart()) {
+            // If cart has custom loops, only make our custom gateway available
+            if (isset($available_gateways['cllf_custom_loop_gateway'])) {
+                return array('cllf_custom_loop_gateway' => $available_gateways['cllf_custom_loop_gateway']);
+            }
+        } else {
+            // If cart has NO custom loops, remove our custom gateway from available options
+            if (isset($available_gateways['cllf_custom_loop_gateway'])) {
+                unset($available_gateways['cllf_custom_loop_gateway']);
+            }
         }
     }
     
-    // If no custom loops or our gateway isn't available, keep standard gateways
     return $available_gateways;
 }
 
@@ -3010,69 +3302,7 @@ add_filter('pre_update_option_cllf_github_token', function($value, $old_value) {
     return $value;
 }, 10, 2);
 
-/**
- * Register function to generate readme.html when visiting plugins page
- */
-add_action('admin_init', 'cllf_maybe_generate_readme');
-
-function cllf_maybe_generate_readme() {
-    // Only run on the plugins page
-    if (!is_admin() || !isset($_SERVER['PHP_SELF']) || basename($_SERVER['PHP_SELF']) !== 'plugins.php') {
-        return;
-    }
-    
-    // Only regenerate readme once per session to prevent overhead
-    if (get_transient('cllf_readme_generated')) {
-        return;
-    }
-    
-    // Set a transient so we don't regenerate the readme too frequently
-    set_transient('cllf_readme_generated', true, HOUR_IN_SECONDS);
-    
-    // Path to the generate-readme.php script
-    $readme_generator = CLLF_PLUGIN_DIR . 'generate-readme.php';
-    
-    // Check if the generator script exists
-    if (file_exists($readme_generator)) {
-        // Define debug constant (false to disable debug output)
-        if (!defined('CLLF_DEBUG')) {
-            define('CLLF_DEBUG', false);
-        }
-        
-        // Include the script which defines the functions but doesn't run
-        require_once($readme_generator);
-        
-        // Run readme generation process but capture any output
-        ob_start();
-        try {
-            // GitHub repository information
-            $github_username = 'rynoceris';
-            $github_repo = 'Texon-Custom-Loop-Form';
-            $github_token = cllf_get_github_token();
-            
-            // Get environment versions directly from WordPress
-            $env_versions = [
-                'wordpress' => get_bloginfo('version'),
-                'woocommerce' => defined('WC_VERSION') ? WC_VERSION : 'Unknown',
-                'php' => phpversion()
-            ];
-            
-            // Get commits and generate readme
-            $commits = get_commits($github_username, $github_repo, $github_token);
-            $versions = create_version_entries($commits);
-            $html = generate_html($versions, $env_versions);
-            
-            // Save the HTML to a file
-            file_put_contents(CLLF_PLUGIN_DIR . 'readme.html', $html);
-           
-        } catch (Exception $e) {
-            // Log error but continue
-            error_log('Error generating readme.html: ' . $e->getMessage());
-        }
-        // Discard any output
-        ob_end_clean();
-    }
-}
+// Note: Removed automatic readme generation functionality as it was not working correctly
 
 /**
  * Add "View details" link to plugin page
@@ -3383,19 +3613,47 @@ function cllf_debug_cart_summary() {
         return;
     }
     
-    $all_submissions = WC()->session->get('cllf_all_submissions', array());
+    // Get current session submissions
+    $current_session_submissions = WC()->session->get('cllf_all_submissions', array());
     
-    if (!empty($all_submissions)) {
-        $total_loops = 0;
-        foreach ($all_submissions as $submission) {
-            $total_loops += $submission['total_loops'];
+    // Count all custom loops actually in the cart (including from previous sessions)
+    $total_loops_in_cart = 0;
+    $custom_loop_products_in_cart = 0;
+    $cart_submissions = array();
+    
+    foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
+        $product = $cart_item['data'];
+        if ($product->get_sku() && strpos($product->get_sku(), 'CL-') === 0) {
+            $total_loops_in_cart += $cart_item['quantity'];
+            $custom_loop_products_in_cart++;
+            
+            // Track submission IDs from cart items
+            $submission_id = isset($cart_item['cllf_submission_id']) ? $cart_item['cllf_submission_id'] : 'No ID';
+            $cart_submissions[] = array(
+                'product_name' => $product->get_name(),
+                'quantity' => $cart_item['quantity'],
+                'submission_id' => $submission_id,
+                'source' => $submission_id && isset($current_session_submissions[$submission_id]) ? 'Current Session' : 'Previous Session'
+            );
         }
-        
+    }
+    
+    // Show debug info if there are custom loops in cart OR current session
+    if ($total_loops_in_cart > 0 || !empty($current_session_submissions)) {
         ?>
         <div style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 10px; margin-bottom: 20px; border-radius: 4px; color: #155724;">
-            <strong>🔍 Debug Summary (Admin Only):</strong> 
-            <?php echo count($all_submissions); ?> custom loop products in session, 
-            totaling <?php echo $total_loops; ?> loops
+            <strong>🔍 Debug Summary (Admin Only):</strong><br>
+            <strong>Cart:</strong> <?php echo $custom_loop_products_in_cart; ?> custom loop products, totaling <?php echo $total_loops_in_cart; ?> loops<br>
+            <strong>Current Session:</strong> <?php echo count($current_session_submissions); ?> submissions
+            
+            <?php if (!empty($cart_submissions)): ?>
+            <br><strong>Cart Breakdown:</strong>
+            <ul style="margin: 5px 0 0 20px; font-size: 12px;">
+                <?php foreach ($cart_submissions as $item): ?>
+                    <li><?php echo esc_html($item['product_name']); ?> (Qty: <?php echo $item['quantity']; ?>, ID: <?php echo esc_html($item['submission_id']); ?>, <?php echo esc_html($item['source']); ?>)</li>
+                <?php endforeach; ?>
+            </ul>
+            <?php endif; ?>
         </div>
         <?php
     }
@@ -4302,3 +4560,290 @@ function cllf_reset_and_recreate_ajax() {
     // Call the create function
     cllf_create_missing_data_ajax();
 }
+// SIMPLIFIED: Only essential hooks to avoid conflicts
+add_action('woocommerce_before_cart', 'cllf_ensure_correct_sublimation_tags');
+
+// DEBUGGING: Log error messages to identify what's still causing issues
+add_filter('woocommerce_add_error', 'cllf_debug_error_messages', 10, 1);
+
+// CART VALIDATION: Fix cart during WooCommerce's cart validation process  
+add_action('woocommerce_check_cart_items', 'cllf_fix_cart_during_validation', 1);
+
+// ALSO: Keep the early template redirect as backup
+add_action('template_redirect', 'cllf_fix_checkout_early', 1);
+
+// Note: Removed nuclear notice clear - no longer needed with proper skip protection
+
+// FINAL: One last cart fix right before checkout template renders
+add_action('woocommerce_checkout_before_customer_details', 'cllf_final_cart_fix', 1);
+
+// AJAX: Intercept WooCommerce AJAX cart validations
+add_action('wp_ajax_woocommerce_checkout', 'cllf_fix_ajax_checkout', 1);
+add_action('wp_ajax_nopriv_woocommerce_checkout', 'cllf_fix_ajax_checkout', 1);
+add_action('wp_ajax_woocommerce_update_order_review', 'cllf_fix_ajax_checkout', 1);
+add_action('wp_ajax_nopriv_woocommerce_update_order_review', 'cllf_fix_ajax_checkout', 1);
+
+// Debug: Log when hooks are being registered
+error_log('CART REFRESH: Hooks registered - cart and targeted checkout fix');
+
+function cllf_ensure_correct_sublimation_tags() {
+    // Log that function was called for debugging
+    error_log('CART REFRESH: Function entry - checking conditions');
+    
+    // REMOVED: Checkout processing skip logic - we WANT fixes to run during order placement
+    // to prevent WooCommerce from reverting cart quantities
+    
+    // Only run on cart page or checkout page (but not during checkout processing)
+    $is_cart_page = is_cart();
+    $is_checkout_page = is_checkout();
+    error_log('CART REFRESH: Page detection - is_cart: ' . ($is_cart_page ? 'YES' : 'NO') . ', is_checkout: ' . ($is_checkout_page ? 'YES' : 'NO'));
+    
+    if (!$is_cart_page && !$is_checkout_page) {
+        error_log('CART REFRESH: Skipping - not cart or checkout page');
+        return;
+    }
+    
+    // Only run this if we have custom loops in the cart
+    if (!cllf_has_custom_loops_in_cart()) {
+        return;
+    }
+    
+    // ALWAYS set skip protection flag when our cart fix runs to prevent protection system conflicts
+    if (WC()->session) {
+        WC()->session->set('cllf_skip_protection_once', true);
+        error_log('CART REFRESH: Set skip protection flag during cart fix');
+    }
+    
+    // Add some basic logging to see if function is running
+    $page_type = is_cart() ? 'CART' : (is_checkout() ? 'CHECKOUT' : 'OTHER');
+    error_log('CART REFRESH: Function called on ' . $page_type . ' page - checking sublimation tags');
+    
+    // Get settings for sublimation product IDs
+    $clloi_settings = get_option('clloi_settings');
+    $sublimation_product_1 = isset($clloi_settings['clloi_sublimation_product_1']) ? $clloi_settings['clloi_sublimation_product_1'] : 49360;
+    $sublimation_product_2 = isset($clloi_settings['clloi_sublimation_product_2']) ? $clloi_settings['clloi_sublimation_product_2'] : 49361;
+    $sublimation_product_3 = isset($clloi_settings['clloi_sublimation_product_3']) ? $clloi_settings['clloi_sublimation_product_3'] : 49359;
+    
+    // Count all custom loops in cart
+    $all_loops = 0;
+    $setup_fee_items = array(); // Track ALL setup fee items (not just existence)
+    $per_loop_fee_items = array();
+    
+    $cart_contents_hash = md5(serialize(WC()->cart->get_cart()));
+    error_log('CART REFRESH: Cart contents hash: ' . $cart_contents_hash);
+    error_log('CART REFRESH: Cart has ' . count(WC()->cart->get_cart()) . ' items');
+    
+    foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
+        $product = $cart_item['data'];
+        
+        // Count all custom loops
+        if ($product->get_sku() && strpos($product->get_sku(), 'CL-') === 0) {
+            $all_loops += $cart_item['quantity'];
+            error_log('CART REFRESH: Found custom loop: ' . $product->get_sku() . ' x' . $cart_item['quantity']);
+        }
+        
+        // Track sublimation fees
+        if ($product->get_sku() === 'Sublimation') {
+            if ($product->get_name() === 'Sublimation Tags - Digital Set Up Fee') {
+                $setup_fee_items[$cart_item_key] = $cart_item; // Track ALL setup fee items
+                error_log('CART REFRESH: Found setup fee (quantity: ' . $cart_item['quantity'] . ')');
+            } elseif ($product->get_name() === 'Sublimation Tags (ea)') {
+                $per_loop_fee_items[$cart_item_key] = $cart_item;
+                error_log('CART REFRESH: Found sublimation tags: x' . $cart_item['quantity'] . ' (Product ID: ' . $cart_item['product_id'] . ')');
+            }
+        }
+    }
+    
+    error_log('CART REFRESH: Total loops counted: ' . $all_loops);
+    
+    // Only proceed if we have custom loops
+    if ($all_loops === 0) {
+        return;
+    }
+    
+    // Check what needs to be fixed
+    $needs_update = false;
+    $correct_per_loop_product_id = ($all_loops < 24) ? $sublimation_product_1 : $sublimation_product_2;
+    
+    // Check setup fee - must be exactly 1
+    $setup_fee_count = 0;
+    $total_setup_fee_quantity = 0;
+    foreach ($setup_fee_items as $setup_item) {
+        $setup_fee_count++;
+        $total_setup_fee_quantity += $setup_item['quantity'];
+    }
+    
+    if ($setup_fee_count !== 1 || $total_setup_fee_quantity !== 1) {
+        $needs_update = true;
+        error_log('CART REFRESH: Setup fee issue - found ' . $setup_fee_count . ' items with total quantity ' . $total_setup_fee_quantity . ', need exactly 1 item with quantity 1');
+    }
+    
+    // Check per-loop tags - must match total loops exactly
+    if (empty($per_loop_fee_items)) {
+        $needs_update = true;
+        error_log('CART REFRESH: Missing sublimation tags, need to add ' . $all_loops . ' loops');
+    } else {
+        foreach ($per_loop_fee_items as $cart_item) {
+            if ($cart_item['quantity'] !== $all_loops || $cart_item['product_id'] !== (int)$correct_per_loop_product_id) {
+                $needs_update = true;
+                error_log('CART REFRESH: Incorrect sublimation tags quantity: ' . $cart_item['quantity'] . ' should be ' . $all_loops);
+                break;
+            }
+        }
+    }
+    
+    // Update if needed
+    if ($needs_update) {
+        error_log('CART REFRESH: Updating sublimation fees for ' . $all_loops . ' total loops');
+        
+        // Set flag to skip protection during our programmatic updates
+        if (WC()->session) {
+            WC()->session->set('cllf_skip_protection_once', true);
+            error_log('CART REFRESH: Set skip protection flag');
+        }
+        
+        // Remove ALL existing sublimation items (both setup fees and per-loop fees)
+        foreach ($setup_fee_items as $cart_item_key => $cart_item) {
+            error_log('CART REFRESH: Removing setup fee item');
+            WC()->cart->remove_cart_item($cart_item_key);
+        }
+        foreach ($per_loop_fee_items as $cart_item_key => $cart_item) {
+            error_log('CART REFRESH: Removing per-loop fee item');
+            WC()->cart->remove_cart_item($cart_item_key);
+        }
+        
+        // Add exactly 1 setup fee
+        WC()->cart->add_to_cart((int)$sublimation_product_3, 1);
+        error_log('CART REFRESH: Added 1 setup fee');
+        
+        // Add correct number of per-loop tags
+        WC()->cart->add_to_cart((int)$correct_per_loop_product_id, $all_loops);
+        error_log('CART REFRESH: Added ' . $all_loops . ' sublimation tags');
+        
+        // Recalculate cart totals
+        WC()->cart->calculate_totals();
+        
+        // CRITICAL: Force save cart to session to prevent reversion
+        if (WC()->session) {
+            WC()->session->set('cart', WC()->cart->get_cart_for_session());
+            WC()->session->save_data();
+            error_log('CART REFRESH: Forced cart save to session');
+        }
+        
+        error_log('CART REFRESH: Successfully updated sublimation tags and saved to session');
+    } else {
+        error_log('CART REFRESH: Sublimation tags are already correct');
+    }
+}
+
+// DEBUG: Log all error messages to identify what's causing checkout issues
+function cllf_debug_error_messages($message) {
+    error_log('CART REFRESH: WooCommerce error message: ' . $message);
+    return $message; // Don't suppress, just log
+}
+
+// CART VALIDATION: Fix cart during WooCommerce's validation process
+function cllf_fix_cart_during_validation() {
+    // Only for checkout/cart with custom loops
+    if (!cllf_has_custom_loops_in_cart()) {
+        return;
+    }
+    
+    // Prevent multiple executions per request
+    static $validation_run = false;
+    if ($validation_run) {
+        return;
+    }
+    $validation_run = true;
+    
+    error_log('CART REFRESH: Fix during WooCommerce cart validation');
+    
+    // Fix cart during validation
+    cllf_ensure_correct_sublimation_tags();
+    
+    // Force WooCommerce to recalculate everything
+    WC()->cart->calculate_totals();
+}
+
+// VERY EARLY: Fix cart before any WooCommerce checkout validation occurs
+function cllf_fix_checkout_early() {
+    // Only for checkout with custom loops
+    if (!is_checkout() || !cllf_has_custom_loops_in_cart()) {
+        return;
+    }
+    
+    // Prevent multiple executions
+    static $already_run = false;
+    if ($already_run) {
+        return;
+    }
+    $already_run = true;
+    
+    error_log('CART REFRESH: Very early fix before checkout validation');
+    
+    // ALWAYS set skip protection flag on checkout pages with custom loops
+    if (WC()->session) {
+        WC()->session->set('cllf_skip_protection_once', true);
+        error_log('CART REFRESH: Set skip protection flag for checkout');
+    }
+    
+    // Fix cart before any validation
+    cllf_ensure_correct_sublimation_tags();
+    
+    // Clear any existing WooCommerce notices that might be cached
+    if (function_exists('wc_clear_notices')) {
+        wc_clear_notices();
+        error_log('CART REFRESH: Cleared WooCommerce notices after fix');
+    }
+}
+
+// AJAX: Fix cart before any AJAX checkout operations
+function cllf_fix_ajax_checkout() {
+    error_log('CART REFRESH: AJAX checkout operation detected');
+    
+    if (!cllf_has_custom_loops_in_cart()) {
+        error_log('CART REFRESH: No custom loops in cart for AJAX operation');
+        return;
+    }
+    
+    error_log('CART REFRESH: Fixing cart for AJAX checkout operation');
+    cllf_ensure_correct_sublimation_tags();
+    
+    // Clear any notices
+    if (function_exists('wc_clear_notices')) {
+        wc_clear_notices();
+        error_log('CART REFRESH: Cleared notices in AJAX handler');
+    }
+}
+
+// Note: Removed nuclear notice clear function - no longer needed
+
+// FINAL: One last attempt to fix cart before checkout details render
+function cllf_final_cart_fix() {
+    if (!cllf_has_custom_loops_in_cart()) {
+        return;
+    }
+    
+    // Prevent multiple executions
+    static $final_run = false;
+    if ($final_run) {
+        return;
+    }
+    $final_run = true;
+    
+    error_log('CART REFRESH: FINAL cart fix before customer details');
+    
+    // Set skip protection flag
+    if (WC()->session) {
+        WC()->session->set('cllf_skip_protection_once', true);
+        error_log('CART REFRESH: Set skip protection for final fix');
+    }
+    
+    // Final cart fix
+    cllf_ensure_correct_sublimation_tags();
+    
+    error_log('CART REFRESH: Final fix completed');
+}
+
+// Simple debug to test if plugin is loading
+error_log('CART REFRESH DEBUG: Plugin loaded at ' . date('Y-m-d H:i:s'));
