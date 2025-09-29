@@ -1,5 +1,6 @@
 /**
  * Custom Laundry Loops Form Scripts
+ * Version: 2.3.4 - With Nonce Refresh Fix
  */
 (function($) {
     'use strict';
@@ -16,9 +17,77 @@
     // Variables for color handling
     let extractedColors = [];
     let selectedTextColor = '#000000';
+    
+    // CRITICAL: Store current nonce globally
+    let currentNonce = '';
 
     // Initialize the form when document is ready
     $(document).ready(function() {
+        console.log('CLLF: Starting initialization...');
+        
+        // CRITICAL FIX: Refresh nonce FIRST before any form interactions
+        refreshNonce().then(function() {
+            console.log('CLLF: Nonce refreshed successfully, initializing form');
+            initializeForm();
+        }).catch(function(error) {
+            console.error('CLLF: Failed to refresh nonce:', error);
+            // Still initialize form with fallback
+            currentNonce = cllfVars.nonce || '';
+            console.warn('CLLF: Using fallback nonce, may cause issues');
+            initializeForm();
+        });
+    });
+    
+    /**
+     * Refresh the nonce via AJAX to bypass caching
+     * This ensures we always have a valid, fresh nonce
+     */
+    function refreshNonce() {
+        return new Promise(function(resolve, reject) {
+            console.log('CLLF: Requesting fresh nonce from server...');
+            
+            $.ajax({
+                url: cllfVars.ajaxurl,
+                type: 'POST',
+                data: {
+                    action: cllfVars.nonceRefreshAction || 'cllf_refresh_nonce'
+                },
+                success: function(response) {
+                    if (response.success && response.data.nonce) {
+                        currentNonce = response.data.nonce;
+                        cllfVars.nonce = response.data.nonce; // Update global variable too
+                        console.log('CLLF: Fresh nonce received:', currentNonce.substring(0, 10) + '...');
+                        resolve(currentNonce);
+                    } else {
+                        console.error('CLLF: Invalid nonce response:', response);
+                        reject('Invalid response from server');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('CLLF: Nonce refresh AJAX error:', status, error);
+                    reject(error);
+                }
+            });
+        });
+    }
+    
+    /**
+     * Periodically refresh nonce (every 10 minutes) to prevent expiration
+     */
+    setInterval(function() {
+        console.log('CLLF: Periodic nonce refresh');
+        refreshNonce().catch(function(error) {
+            console.error('CLLF: Periodic nonce refresh failed:', error);
+        });
+    }, 600000); // 10 minutes
+    
+    /**
+     * Initialize all form functionality
+     * This runs AFTER nonce is refreshed
+     */
+    function initializeForm() {
+        console.log('CLLF: Initializing form controls...');
+        
         // Show/hide scroll to top button based on scroll position
         const scrollToTopBtn = $('#scroll-to-top');
         
@@ -223,7 +292,7 @@
                     // Create a separate form submission for the logo
                     const logoFormData = new FormData();
                     logoFormData.append('action', 'cllf_temp_logo_upload');
-                    logoFormData.append('nonce', cllfVars.nonce);
+                    logoFormData.append('nonce', currentNonce); // USE FRESH NONCE
                     logoFormData.append('logo_file', file);
                     
                     // Show loading state
@@ -439,12 +508,34 @@
             clearForm();
         });
 
+        // Process names from textarea
+        $('#names_paste').on('input', function() {
+            validateNamesPaste($(this).val());
+        });
+        
+        // Character count for sport word
+        $('#sport_word').on('input', function() {
+            const currentLength = $(this).val().length;
+            $('#sport-word-char-count').text(currentLength);
+            
+            if (currentLength >= 15) {
+                $('#sport-word-char-count').parent().addClass('near-limit');
+            } else {
+                $('#sport-word-char-count').parent().removeClass('near-limit');
+            }
+        });
+        
+        // Initialize character count for sport word
+        $('#sport-word-char-count').text($('#sport_word').val().length);
+
         // Initialize order summary
         updateOrderSummary();
         
         // Initialize loop preview
         updateLoopPreview();
-    });
+        
+        console.log('CLLF: Form initialization complete');
+    }
 
     /**
      * Function to save the current form data before submission
@@ -478,11 +569,6 @@
         return data;
     }
     
-    // Process names from textarea
-    $('#names_paste').on('input', function() {
-        validateNamesPaste($(this).val());
-    });
-    
     /**
      * Validate names in the paste textarea
      */
@@ -506,21 +592,6 @@
             $('#names-length-warning').remove();
         }
     }
-    
-    // Character count for sport word
-    $('#sport_word').on('input', function() {
-        const currentLength = $(this).val().length;
-        $('#sport-word-char-count').text(currentLength);
-        
-        if (currentLength >= 15) {
-            $('#sport-word-char-count').parent().addClass('near-limit');
-        } else {
-            $('#sport-word-char-count').parent().removeClass('near-limit');
-        }
-    });
-    
-    // Initialize character count for sport word
-    $('#sport-word-char-count').text($('#sport_word').val().length);
 
     /**
      * Process names from textarea into individual input fields
@@ -911,16 +982,10 @@
         formData.append('font_choice', $('#font_choice').val());
         formData.append('action', 'cllf_submit_form');
         
-        // Try to get nonce from the form first
-        let nonceValue = $('input[name="nonce"]').val();
+        // CRITICAL FIX: Use the fresh nonce instead of cached one
+        formData.append('nonce', currentNonce);
         
-        // If not found, use the one from the global variable
-        if (!nonceValue && typeof cllfVars !== 'undefined' && cllfVars.nonce) {
-            nonceValue = cllfVars.nonce;
-            console.log('Using nonce from global variable:', nonceValue);
-        }
-        
-        formData.append('nonce', nonceValue);
+        console.log('CLLF: Submitting form with fresh nonce:', currentNonce.substring(0, 10) + '...');
         
         // Save the current form data before submission
         lastFormData = saveFormData();
@@ -959,16 +1024,6 @@
             }
         }
         
-        // Validate form before submission
-        if (!validateForm()) {
-            return;
-        }
-        
-        // Show loading state
-        $('#cllf-form').addClass('cllf-loading');
-        $('#cllf-submit-btn').prop('disabled', true);
-        $('#cllf-form-messages').removeClass('cllf-error cllf-success').empty();
-        
         $.ajax({
             url: cllfVars.ajaxurl,
             type: 'POST',
@@ -976,6 +1031,8 @@
             processData: false,
             contentType: false,
             success: function(response) {
+                console.log('CLLF: Form submission response:', response);
+                
                 if (response.success) {
                     // Hide the form buttons
                     $('.cllf-button-container').hide();
@@ -1036,15 +1093,31 @@
                         scrollTop: $('#cllf-form-messages').offset().top - 100
                     }, 500);
                 } else {
-                    $('#cllf-form-messages')
-                        .addClass('cllf-error')
-                        .text(response.data || 'An error occurred. Please try again.');
+                    const errorMsg = response.data || 'An error occurred. Please try again.';
+                    console.error('CLLF: Form submission error:', errorMsg);
+                    
+                    // If nonce error, try to refresh nonce and inform user
+                    if (errorMsg.toLowerCase().includes('nonce') || errorMsg.toLowerCase().includes('security') || errorMsg.toLowerCase().includes('session')) {
+                        $('#cllf-form-messages')
+                            .addClass('cllf-error')
+                            .text('Your session has expired. Refreshing the page...');
+                        
+                        setTimeout(function() {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        $('#cllf-form-messages')
+                            .addClass('cllf-error')
+                            .text(errorMsg);
+                    }
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
+                console.error('CLLF: AJAX error:', status, error);
+                console.error('CLLF: Response:', xhr.responseText);
                 $('#cllf-form-messages')
                     .addClass('cllf-error')
-                    .text('A server error occurred. Please try again.');
+                    .text('A connection error occurred. Please check your internet connection and try again.');
             },
             complete: function() {
                 // Remove loading state
@@ -1223,53 +1296,6 @@
     }
     
     /**
-     * Upload logo for color extraction
-     */
-    function uploadLogoForColorExtraction(file) {
-        console.log('Starting logo upload for color extraction...', file);
-        
-        const formData = new FormData();
-        formData.append('action', 'cllf_temp_logo_upload');
-        formData.append('nonce', cllfVars.nonce);
-        formData.append('logo_file', file);
-        
-        // Show loading state
-        $('#text_color').prop('disabled', true);
-        $('#color-preview').addClass('loading');
-        $('#text-color-container').addClass('color-loading');
-        
-        console.log('Sending AJAX request to upload logo...');
-        
-        $.ajax({
-            url: cllfVars.ajaxurl,
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                console.log('Logo upload response received:', response);
-                
-                if (response.success) {
-                    console.log('Logo uploaded successfully, URL:', response.data.url);
-                    extractColorsFromLogo(response.data.url);
-                    // And then remove the loading state when done
-                    $('#text_color').prop('disabled', false);
-                    $('#color-preview').removeClass('loading');
-                    $('#text-color-container').removeClass('color-loading');
-                } else {
-                    console.error('Error uploading logo:', response.data);
-                    resetColorDropdown();
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error('AJAX error during logo upload:', status, error);
-                console.error('Response:', xhr.responseText);
-                resetColorDropdown();
-            }
-        });
-    }
-    
-    /**
      * Extract colors from the uploaded logo
      */
     function extractColorsFromLogo(logoUrl, callback) {
@@ -1280,7 +1306,7 @@
             type: 'POST',
             data: {
                 action: 'cllf_extract_logo_colors',
-                nonce: cllfVars.nonce,
+                nonce: currentNonce, // USE FRESH NONCE
                 logo_url: logoUrl
             },
             success: function(response) {

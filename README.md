@@ -19,6 +19,7 @@ The Custom Laundry Loops Form plugin allows customers to order custom laundry lo
 - **Live Preview**: Real-time preview of loop configurations
 - **WooCommerce Integration**: Seamless cart and checkout integration
 - **Multi-Session Support**: Persistent cart across user sessions
+- **Cache-Resistant Security**: Dynamic nonce refresh system for WP Engine compatibility
 
 ## Requirements
 
@@ -31,6 +32,7 @@ The Custom Laundry Loops Form plugin allows customers to order custom laundry lo
 - **WordPress**: Up to 6.8.2
 - **WooCommerce**: Up to 10.1.2  
 - **PHP**: Up to 8.2.28
+- **Hosting**: Optimized for WP Engine
 
 ## Installation
 
@@ -60,6 +62,12 @@ Place this shortcode on any page where you want the custom loops form to appear.
 
 ## Key Features
 
+### Security & Performance
+- **Dynamic Nonce Refresh**: Bypasses page caching to prevent security token expiration
+- **WP Engine Optimized**: Designed to work seamlessly with aggressive caching
+- **Session Management**: Automatic nonce renewal every 10 minutes
+- **Graceful Degradation**: Auto-refresh on nonce expiration with user-friendly messaging
+
 ### Cart Management
 - **Multi-Session Persistence**: Maintains cart contents across user sessions
 - **Automatic Quantity Calculation**: Smart sublimation tag quantity management
@@ -79,6 +87,14 @@ Place this shortcode on any page where you want the custom loops form to appear.
 - **Email Notifications**: Custom order confirmation emails
 
 ## Version History
+
+### Version 2.3.4 - September 2025
+- **Fixed**: WP Engine page caching causing nonce security errors
+- **Added**: Dynamic nonce refresh system via AJAX
+- **Added**: Automatic nonce renewal every 10 minutes
+- **Improved**: User-friendly error messages for expired sessions
+- **Enhanced**: Cache-bypass mechanism for security tokens
+- **Optimized**: WP Engine hosting compatibility
 
 ### Version 2.3.3 - September 2025
 - **Fixed**: Multi-session cart quantity calculation issues
@@ -104,6 +120,29 @@ Place this shortcode on any page where you want the custom loops form to appear.
 
 [View complete changelog](readme.html)
 
+## Troubleshooting
+
+### "Invalid Nonce Security Error"
+This is typically caused by cached pages on WP Engine. Version 2.3.4 resolves this with dynamic nonce refresh. If you still experience issues:
+1. Clear WP Engine cache completely
+2. Test in an incognito/private browser window
+3. Verify you're running version 2.3.4
+
+### WP Engine Cache Configuration (Optional)
+For optimal performance, you can exclude the form page from WP Engine caching:
+1. Go to WP Engine dashboard → Environment → Advanced caching
+2. Add the form page URL to excluded pages
+
+Or add this to your theme's `functions.php`:
+```php
+function exclude_cllf_from_cache() {
+	if (is_page('your-form-page-slug')) {
+		header('Cache-Control: no-cache, must-revalidate, max-age=0');
+	}
+}
+add_action('template_redirect', 'exclude_cllf_from_cache');
+```
+
 ## Support
 
 For support and feature requests:
@@ -114,14 +153,15 @@ For support and feature requests:
 
 ## Development
 
-This plugin is actively developed and maintained by Texon Towel.
+This plugin is actively developed and maintained by Texon Towel with AI assistance from Claude (Anthropic).
 
 ### Contributing
 This is a proprietary plugin developed specifically for Texon Towel's custom laundry loop products.
 
 ### Security
 The plugin includes robust security measures:
-- Nonce verification for all form submissions
+- Dynamic nonce generation bypassing page cache
+- Automatic nonce refresh mechanism
 - File upload validation and sanitization  
 - SQL injection prevention
 - XSS protection
@@ -135,9 +175,10 @@ The plugin includes robust security measures:
 ## Credits
 
 - **Developer**: Ryan Ours
+- **AI Development Assistant**: Claude (Anthropic)
 - **Copyright**: © 2025 Texon Towel
 - **Contributors**: Texon Towel Team
 
 ---
 
-**Built with ❤️ for the textile industry**
+**Built with care for the textile industry**

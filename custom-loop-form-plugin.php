@@ -6,7 +6,7 @@
  * Plugin Name:          Custom Laundry Loops Form
  * Plugin URI:           https://www.texontowel.com
  * Description:          Display a custom form for ordering custom laundry loops directly on the frontend.
- * Version:              2.3.3
+ * Version:              2.3.4
  * Author:               Texon Towel
  * Author URI:           https://www.texontowel.com
  * Developer:            Ryan Ours
@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('CLLF_VERSION', '1.0.0');
+define('CLLF_VERSION', '2.3.4');
 define('CLLF_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CLLF_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -75,16 +75,34 @@ function cllf_enqueue_scripts() {
         wp_enqueue_style('cllf-styles', CLLF_PLUGIN_URL . 'css/cllf-styles.css', array(), CLLF_VERSION);
         wp_enqueue_script('cllf-scripts', CLLF_PLUGIN_URL . 'js/cllf-scripts.js', array('jquery'), CLLF_VERSION, true);
         
-        // Pass variables to JS
+        // Pass variables to JS - with empty nonce that will be refreshed via AJAX
         wp_localize_script('cllf-scripts', 'cllfVars', array(
             'ajaxurl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('cllf-nonce'),
+            'nonce' => '', // Will be populated via AJAX to avoid cache issues
             'nonceFieldName' => 'nonce',
-            'pluginUrl' => CLLF_PLUGIN_URL
+            'pluginUrl' => CLLF_PLUGIN_URL,
+            'nonceRefreshAction' => 'cllf_refresh_nonce'
         ));
     }
 }
 add_action('wp_enqueue_scripts', 'cllf_enqueue_scripts');
+
+/**
+ * AJAX handler to refresh nonce - bypasses caching
+ * This ensures users always get a fresh, valid nonce
+ */
+function cllf_refresh_nonce_ajax() {
+    // No nonce verification needed for getting a nonce
+    // This is a public endpoint that just generates a new nonce
+    $fresh_nonce = wp_create_nonce('cllf-nonce');
+    
+    wp_send_json_success(array(
+        'nonce' => $fresh_nonce,
+        'timestamp' => current_time('timestamp')
+    ));
+}
+add_action('wp_ajax_cllf_refresh_nonce', 'cllf_refresh_nonce_ajax');
+add_action('wp_ajax_nopriv_cllf_refresh_nonce', 'cllf_refresh_nonce_ajax');
 
 // Create directory structure on plugin activation
 function cllf_activate() {
@@ -351,6 +369,24 @@ function cllf_handle_direct_form_submission() {
     // Get existing submissions array or create new one
     $all_submissions = WC()->session->get('cllf_all_submissions', array());
     
+    // IMPORTANT: Check cart items for existing submissions from previous sessions
+    // This handles the case where user adds loops in one session, then adds more in another session
+    if (WC()->cart) {
+        foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
+            if (isset($cart_item['cllf_submission_id'])) {
+                $existing_submission_id = $cart_item['cllf_submission_id'];
+                
+                // Only add if not already in our current session data
+                if (!isset($all_submissions[$existing_submission_id]) && isset($cart_item['cllf_submission_data'])) {
+                    $all_submissions[$existing_submission_id] = $cart_item['cllf_submission_data'];
+                    error_log('MULTI-SESSION: Recovered submission data for ID: ' . $existing_submission_id);
+                }
+            }
+        }
+    }
+    
+    error_log('MULTI-SESSION: Starting with ' . count($all_submissions) . ' existing submissions before adding new one');
+    
     // Store this submission's data
     $submission_data = array(
         'submission_id' => $submission_id,
@@ -439,10 +475,10 @@ function cllf_handle_direct_form_submission() {
      error_log('Received nonce: ' . $received_nonce);
      
      if (!wp_verify_nonce($received_nonce, 'cllf-nonce')) {
-         error_log('ERROR: Nonce verification failed for value: ' . $received_nonce);
-         wp_send_json_error('Security check failed: Invalid nonce value');
-         exit;
-     }
+          error_log('ERROR: Nonce verification failed for value: ' . $received_nonce);
+          wp_send_json_error('Security check failed: Your session has expired. Please refresh the page and try again.');
+          exit;
+      }
      
      error_log('SUCCESS: Nonce verification passed');
      
@@ -1121,7 +1157,12 @@ function cllf_process_order_and_add_to_cart($loop_color, $sock_clips, $total_loo
             $product->save();
             
             // Ensure we use an integer product ID
-            WC()->cart->add_to_cart((int)$product_id, $total_loops);
+            // Add submission ID and data to cart item
+            $cart_item_data = array(
+                'cllf_submission_id' => $submission_id,
+                'cllf_submission_data' => $submission_data
+            );
+            WC()->cart->add_to_cart((int)$product_id, $total_loops, 0, array(), $cart_item_data);
         } else {
             error_log("Failed to load product with ID: $product_id");
             // Handle error - maybe create a new product instead
@@ -1152,7 +1193,12 @@ function cllf_process_order_and_add_to_cart($loop_color, $sock_clips, $total_loo
         // Verify we have a valid product ID
         if ($new_product_id && is_numeric($new_product_id) && $new_product_id > 0) {
             // Cast to int for safety
-            WC()->cart->add_to_cart((int)$new_product_id, $total_loops);
+            // Add submission ID and data to cart item
+            $cart_item_data = array(
+                'cllf_submission_id' => $submission_id,
+                'cllf_submission_data' => $submission_data
+            );
+            WC()->cart->add_to_cart((int)$new_product_id, $total_loops, 0, array(), $cart_item_data);
         } else {
             error_log("Failed to create new product with SKU: $sku");
             // Handle the error - perhaps show a message to the user
@@ -1467,9 +1513,13 @@ function cllf_save_form_data_to_order($order_id) {
          $verification = get_post_meta($order_id, '_cllf_all_submissions', true);
          if ($verification && count($verification) === count($all_submissions)) {
              error_log('SUCCESS: Verification passed - data was saved to order');
+             error_log('Saved submission IDs: ' . implode(', ', array_keys($verification)));
          } else {
              error_log('ERROR: Verification failed - data was NOT saved properly to order');
              error_log('Expected: ' . count($all_submissions) . ' submissions, Got: ' . (is_array($verification) ? count($verification) : 'not an array'));
+             if (is_array($verification)) {
+                 error_log('Actually saved submission IDs: ' . implode(', ', array_keys($verification)));
+             }
          }
          
          // Clear session data
@@ -2017,13 +2067,22 @@ function cllf_display_form_data_in_admin($order) {
 }
 
 // Send admin notification email when order is placed
-add_action('woocommerce_thankyou', 'cllf_send_admin_notification', 10, 1);
+add_action('woocommerce_thankyou', 'cllf_send_admin_notification', 20, 1);
 
 /**
  * Updated admin email notification to include ALL custom loop products
  * This function replaces the existing cllf_send_admin_notification function
  */
 function cllf_send_admin_notification($order_id) {
+    error_log('=== EMAIL NOTIFICATION DEBUG START ===');
+    error_log('Order ID: ' . $order_id);
+    
+    // Prevent duplicate emails by checking if we've already sent for this order
+    if (get_post_meta($order_id, '_cllf_admin_email_sent', true)) {
+        error_log('Email already sent for order ' . $order_id . ', skipping duplicate');
+        return;
+    }
+    
     $order = wc_get_order($order_id);
     
     // Check if the order contains any custom loop products
@@ -2036,13 +2095,17 @@ function cllf_send_admin_notification($order_id) {
         }
     }
     
+    error_log('Has custom loops: ' . ($has_custom_loops ? 'YES' : 'NO'));
+    
     // Only proceed if there are custom loop products in the order
     if (!$has_custom_loops) {
+        error_log('No custom loops found, exiting email function');
         return;
     }
     
     // Get all submissions
     $all_submissions = get_post_meta($order_id, '_cllf_all_submissions', true);
+    error_log('Retrieved all_submissions from order meta: ' . (is_array($all_submissions) ? count($all_submissions) . ' submissions' : 'NOT AN ARRAY or EMPTY'));
     
     // Check if we have multiple submissions
     if (!empty($all_submissions) && is_array($all_submissions)) {
@@ -2170,10 +2233,16 @@ function cllf_send_admin_notification($order_id) {
         
         // Send the email - removed the page condition that was causing the issue
         wp_mail($to, $subject, $message, $headers);
+        error_log('Sent multi-submission format email with ' . count($all_submissions) . ' products');
+        
+        // Mark email as sent to prevent duplicates
+        update_post_meta($order_id, '_cllf_admin_email_sent', true);
         
     } else {
+        error_log('No all_submissions data found, checking for legacy data');
         // Fallback to original single product email for backward compatibility
         $loop_color = get_post_meta($order_id, '_cllf_loop_color', true);
+        error_log('Legacy loop_color: ' . ($loop_color ? $loop_color : 'EMPTY'));
         if ($loop_color) {
             // Build the fallback email for legacy single-product orders
             $headers[] = "From: Texon Athletic Towel <sales@texontowel.com>" . "\r\n";
@@ -2263,8 +2332,16 @@ function cllf_send_admin_notification($order_id) {
             
             // Send the email - removed the page condition that was causing the issue
             wp_mail($to, $subject, $message, $headers);
+            error_log('Sent legacy format email');
+            
+            // Mark email as sent to prevent duplicates
+            update_post_meta($order_id, '_cllf_admin_email_sent', true);
+        } else {
+            error_log('ERROR: No legacy data found either!');
         }
     }
+    
+    error_log('=== EMAIL NOTIFICATION DEBUG END ===');
 }
 
 /**

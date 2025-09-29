@@ -44,6 +44,12 @@
 			border-radius: 4px;
 			margin-bottom: 10px;
 		}
+		.critical-fix {
+			background-color: #fff3cd;
+			border-left: 4px solid #ffc107;
+			padding: 10px;
+			margin: 10px 0;
+		}
 		ul {
 			margin-left: 20px;
 		}
@@ -54,6 +60,12 @@
 			font-size: 0.9em;
 			color: #777;
 		}
+		code {
+			background-color: #f5f5f5;
+			padding: 2px 6px;
+			border-radius: 3px;
+			font-family: monospace;
+		}
 	</style>
 </head>
 <body>
@@ -61,14 +73,14 @@
 	
 	<div class="plugin-info">
 		<p><strong>Contributors:</strong> Texon Towel, Ryan Ours</p>
-		<p><strong>Tags:</strong> custom, laundry loops, woocommerce</p>
+		<p><strong>Tags:</strong> custom, laundry loops, woocommerce, wpengine, caching</p>
 		<p><strong>Requires WordPress:</strong> 6.5+</p>
 		<p><strong>Tested up to:</strong> 6.8.2</p>
 		<p><strong>Requires WooCommerce:</strong> 8.8.x+</p>
 		<p><strong>Tested up to:</strong> 10.1.2</p>
 		<p><strong>Requires PHP:</strong> 8.1</p>
-		<p><strong>Tested up to:</strong> 8.2.27</p>
-		<p><strong>Stable tag:</strong> 2.3.3</p>
+		<p><strong>Tested up to:</strong> 8.2.28</p>
+		<p><strong>Stable tag:</strong> 2.3.4</p>
 		<p><strong>License:</strong> GPLv3 or later</p>
 		<p><strong>License URI:</strong> <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">https://www.gnu.org/licenses/gpl-3.0.en.html</a></p>
 	</div>
@@ -88,6 +100,8 @@
 		<li>Text color customization</li>
 		<li>Live preview of loops</li>
 		<li>Direct integration with WooCommerce cart and checkout</li>
+		<li><strong>Dynamic nonce refresh for cache compatibility</strong></li>
+		<li><strong>WP Engine optimized</strong></li>
 	</ul>
 	
 	<h2>Installation</h2>
@@ -95,6 +109,7 @@
 		<li>Upload the plugin files to the <code>/wp-content/plugins/custom-laundry-loops-form</code> directory</li>
 		<li>Activate the plugin through the 'Plugins' menu in WordPress</li>
 		<li>Place the shortcode <code>[custom_laundry_loops_form]</code> on any page where you want the form to appear</li>
+		<li>If on WP Engine, clear cache after installation</li>
 	</ol>
 	
 	<h2>Frequently Asked Questions</h2>
@@ -105,8 +120,31 @@
 	<h3>Can customers upload their own logos?</h3>
 	<p>Yes, the form includes an option for logo upload in various formats including PNG, JPG, SVG, AI, and PDF.</p>
 	
+	<h3>Why am I getting "Invalid nonce security error"?</h3>
+	<p>This was caused by page caching serving stale security tokens. Version 2.3.4 fixes this with dynamic nonce refresh. Clear your WP Engine cache and ensure you're running the latest version.</p>
+	
+	<h3>Is this plugin compatible with WP Engine?</h3>
+	<p>Yes! Version 2.3.4 is specifically optimized for WP Engine's aggressive caching. The plugin now uses AJAX to bypass cache and ensure fresh security tokens.</p>
+	
 	<h2>Changelog</h2>
 	
+	<div class="changelog-item">
+		<h3>Version 2.3.4 - September 29, 2025</h3>
+		<div class="critical-fix">
+			<strong>CRITICAL FIX:</strong> WP Engine page caching nonce expiration issue
+		</div>
+		<ul>
+			<li><strong>Fixed:</strong> "Invalid nonce security error" preventing order submissions on cached pages</li>
+			<li><strong>Added:</strong> Dynamic AJAX-based nonce refresh system that bypasses WP Engine page cache</li>
+			<li><strong>Added:</strong> Automatic nonce renewal every 10 minutes to prevent session expiration</li>
+			<li><strong>Improved:</strong> User-friendly error messages with automatic page reload on session expiration</li>
+			<li><strong>Enhanced:</strong> Cache-bypass mechanism ensures fresh security tokens on every page load</li>
+			<li><strong>Optimized:</strong> Full compatibility with WP Engine and other aggressive caching systems</li>
+			<li><strong>Technical:</strong> Implemented <code>cllf_refresh_nonce_ajax()</code> endpoint and JavaScript promise-based async nonce management</li>
+		</ul>
+		<p><em>Impact: Resolves #1 cause of order submission failures for University of Michigan and other customers on cached hosting environments.</em></p>
+	</div>
+
 	<div class="changelog-item">
 		<h3>Version 2.3.3 - September 2025</h3>
 		<ul>
@@ -192,6 +230,7 @@
 	
 	<div class="footer">
 		<p>© 2025 Texon Towel - Custom Laundry Loops Form Plugin</p>
+		<p>Developed with AI assistance from Claude (Anthropic)</p>
 	</div>
 </body>
 </html>
